@@ -6,10 +6,5 @@ __pycache__
 *.pyw
 *.pyz
 *.pywz
-<<<<<<< Updated upstream
 .env
 microservices/8652_Hybrid.bim
-=======
-
-microservices/data/
->>>>>>> Stashed changes
