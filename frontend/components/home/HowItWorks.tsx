@@ -1,5 +1,6 @@
 'use client';
 
+import { useRouter } from 'next/navigation';
 import { Card } from '../ui/Card';
 import { Button } from '../ui/Button';
 import { Search, Wand2, TestTube, Target, Dna, ArrowRight, Info } from 'lucide-react';
@@ -18,7 +19,7 @@ const stages = [
       'Candidate gene ranking',
     ],
     color: 'primary',
-    link: '#',
+    link: '/home/how-it-works/trait-mining',
   },
   {
     id: 2,
@@ -33,7 +34,7 @@ const stages = [
       'Edit optimization',
     ],
     color: 'accent',
-    link: '#',
+    link: '/home/how-it-works/edit-design',
   },
   {
     id: 3,
@@ -48,7 +49,7 @@ const stages = [
       'Yield prediction',
     ],
     color: 'primary',
-    link: '#',
+    link: '/home/how-it-works/validation',
   },
   {
     id: 4,
@@ -63,7 +64,7 @@ const stages = [
       'Optimal solution selection',
     ],
     color: 'accent',
-    link: '#',
+    link: '/home/how-it-works/optimization',
   },
   {
     id: 5,
@@ -78,11 +79,13 @@ const stages = [
       'Guide RNA optimization',
     ],
     color: 'primary',
-    link: '#',
+    link: '/home/how-it-works/guide-design',
   },
 ];
 
 export function HowItWorks() {
+  const router = useRouter();
+  
   return (
     <section id="how-it-works" className="py-12 sm:py-16 lg:py-20">
       <div className="text-center mb-12">
@@ -113,8 +116,7 @@ export function HowItWorks() {
                   hover
                   className="relative overflow-hidden cursor-pointer group"
                   onClick={() => {
-                    console.log(`Learn more about ${stage.title}`);
-                    // Navigate to detailed page
+                    router.push(stage.link);
                   }}
                 >
                   {/* Step Number */}
@@ -176,7 +178,7 @@ export function HowItWorks() {
                         size="md"
                         onClick={(e) => {
                           e.stopPropagation();
-                          console.log(`Learn more about ${stage.title}`);
+                          router.push(stage.link);
                         }}
                         className={`group-hover:scale-105 transition-transform ${
                           isPrimary 
@@ -211,7 +213,7 @@ export function HowItWorks() {
               variant="primary"
               size="lg"
               onClick={() => {
-                console.log('Start using the pipeline');
+                router.push('/dashboard');
               }}
             >
               Start Using Pipeline

@@ -348,7 +348,7 @@ export default function LandingPage() {
               <Link href="/dashboard/chatbot" className="text-text/60 hover:text-primary transition-colors">
                 AI Tutor
               </Link>
-              <Link href="#" className="text-text/60 hover:text-primary transition-colors">
+              <Link href="/home/documentation" className="text-text/60 hover:text-primary transition-colors">
                 Documentation
               </Link>
             </div>

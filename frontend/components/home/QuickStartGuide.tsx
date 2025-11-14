@@ -59,7 +59,7 @@ export function QuickStartGuide() {
       ],
       ctaText: 'View Documentation',
       onClick: () => {
-        console.log('Navigate to documentation');
+        router.push('/home/documentation');
       },
       color: 'primary',
     },

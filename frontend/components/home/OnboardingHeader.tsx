@@ -18,13 +18,13 @@ const quickLinks = [
   {
     icon: <BookOpen className="w-5 h-5" />,
     title: 'Resources',
-    href: '#',
+    href: '/home/resources',
     color: 'primary',
   },
   {
     icon: <FileText className="w-5 h-5" />,
     title: 'Docs',
-    href: '#',
+    href: '/home/documentation',
     color: 'accent',
   },
 ];
