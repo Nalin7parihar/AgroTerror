@@ -72,11 +72,20 @@ export function DNAHelixAnimation() {
   }, []);
 
   return (
-    <canvas
-      ref={canvasRef}
-      className="w-full h-full"
-      style={{ background: 'transparent' }}
-    />
+    <div className="w-full h-full relative" style={{ backgroundColor: 'transparent' }}>
+      <canvas
+        ref={canvasRef}
+        className="w-full h-full"
+        style={{ 
+          background: 'transparent',
+          backgroundColor: 'transparent',
+          display: 'block',
+          width: '100%',
+          height: '100%',
+          position: 'relative'
+        }}
+      />
+    </div>
   );
 }
 
