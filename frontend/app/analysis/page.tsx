@@ -577,11 +577,11 @@ const DNALab3D = () => {
               {/* Tabs for Edit Suggestions */}
               {analysisResult && analysisResult.edit_suggestions.length > 0 && (
                 <div className="mb-4 border-b border-[var(--primary)]/30">
-                  <div className="flex flex-wrap gap-2 overflow-x-auto">
+                  <div className="flex flex-wrap gap-2 overflow-x-auto pb-2">
                     <button
                       onClick={() => setActiveTab(0)}
                       className={`
-                        flex items-center gap-2 px-3 py-2 border-b-2 transition-colors text-sm
+                        flex items-center gap-2 px-3 py-2 border-b-2 transition-colors text-sm whitespace-nowrap
                         ${activeTab === 0 
                           ? 'border-[var(--primary)] text-[var(--primary)] font-semibold' 
                           : 'border-transparent text-[var(--text)]/60 hover:text-[var(--text)] hover:border-[var(--primary)]/40'
@@ -591,7 +591,7 @@ const DNALab3D = () => {
                       <Dna className="w-4 h-4" />
                       <span>Overview</span>
                     </button>
-                    {analysisResult.edit_suggestions.slice(0, 5).map((edit, idx) => {
+                    {analysisResult.edit_suggestions.map((edit, idx) => {
                       const tabId = idx + 1;
                       const isActive = activeTab === tabId;
                       return (
@@ -599,7 +599,7 @@ const DNALab3D = () => {
                           key={tabId}
                           onClick={() => setActiveTab(tabId)}
                           className={`
-                            flex items-center gap-2 px-3 py-2 border-b-2 transition-colors text-sm
+                            flex items-center gap-2 px-3 py-2 border-b-2 transition-colors text-sm whitespace-nowrap
                             ${isActive 
                               ? 'border-[var(--primary)] text-[var(--primary)] font-semibold' 
                               : 'border-transparent text-[var(--text)]/60 hover:text-[var(--text)] hover:border-[var(--primary)]/40'
@@ -628,9 +628,9 @@ const DNALab3D = () => {
                     if (!seqToUse) return '';
                     if (activeTab === 0) return seqToUse;
                     const edit = analysisResult.edit_suggestions[activeTab - 1];
-                    if (!edit) return seqToUse;
+                    if (!edit || !edit.target_base) return seqToUse;
                     const seq = seqToUse.split('');
-                    if (seq[edit.target_position]) {
+                    if (seq[edit.target_position] && edit.target_base) {
                       seq[edit.target_position] = edit.target_base;
                     }
                     return seq.join('');

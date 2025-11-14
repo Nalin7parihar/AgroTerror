@@ -452,7 +452,7 @@ async def suggest_gene_edits(request: GeneEditRequest):
         validations_raw = dnabert_service.validate_edits(
             original_sequence=request.dna_sequence,
             edit_suggestions=edit_suggestions_raw,
-            threshold=0.0
+            threshold=0.05
         )
         
         dnabert_validations = [
