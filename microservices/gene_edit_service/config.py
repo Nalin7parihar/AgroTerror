@@ -16,7 +16,8 @@ MICROSERVICES_DIR = BASE_DIR.parent
 # Service paths
 GRAPH_CRISPR_DIR = MICROSERVICES_DIR / "Graph-CRISPR"
 DNABERT_DIR = MICROSERVICES_DIR / "DNABERT"
-BIM_FILE_PATH = MICROSERVICES_DIR / "data/maize.bim"
+DATA_DIR = MICROSERVICES_DIR / "data"
+BIM_FILE_PATH = DATA_DIR / "maize.bim"  # Default dataset
 
 # Configuration from environment variables
 GRAPH_CRISPR_CONFIG_PATH = os.getenv(
@@ -30,6 +31,14 @@ DNABERT_MODEL_PATH = os.getenv("DNABERT_MODEL_PATH", None)
 DNABERT_KMER = int(os.getenv("DNABERT_KMER", "6"))
 
 BIM_FILE_PATH_ENV = os.getenv("BIM_FILE_PATH", str(BIM_FILE_PATH))
+DEFAULT_DATASET = os.getenv("DEFAULT_DATASET", "maize")
+
+# Redis configuration
+REDIS_HOST = os.getenv("REDIS_HOST", "localhost")
+REDIS_PORT = int(os.getenv("REDIS_PORT", "6379"))
+REDIS_DB = int(os.getenv("REDIS_DB", "0"))
+REDIS_PASSWORD = os.getenv("REDIS_PASSWORD", None)
+REDIS_ENABLED = os.getenv("REDIS_ENABLED", "true").lower() == "true"
 
 # Server configuration
 HOST = os.getenv("HOST", "0.0.0.0")

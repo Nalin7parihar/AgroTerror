@@ -78,6 +78,8 @@ class GeneEditRequest(BaseModel):
     target_region: Optional[str] = Field(None, description="Specific region to target (chromosome:start-end)")
     max_suggestions: int = Field(5, ge=1, le=20, description="Maximum number of edit suggestions")
     min_efficiency: float = Field(50.0, ge=0, le=100, description="Minimum editing efficiency threshold")
+    dataset_name: Optional[str] = Field(None, description="[Optional] Plant dataset to use (e.g., 'maize', 'rice', 'soyabean'). Auto-detected from request if not specified.")
+    dataset_category: Optional[str] = Field(None, description="[Optional] Dataset category (e.g., 'cereals', 'legumes'). Auto-detected if not specified.")
 
 
 class GeneEditResponse(BaseModel):
@@ -90,6 +92,15 @@ class GeneEditResponse(BaseModel):
     metrics: Dict[str, Any] = Field(default_factory=dict)
 
 
+class DatasetInfo(BaseModel):
+    """Dataset information"""
+    name: str
+    display_name: str
+    category: str
+    plant_type: str
+    description: Optional[str] = None
+
+
 class HealthResponse(BaseModel):
     """Health check response"""
     status: str
@@ -97,4 +108,7 @@ class HealthResponse(BaseModel):
     dnabert_available: bool
     bim_data_loaded: bool
     total_snps_in_database: int
+    redis_connected: bool = False
+    current_dataset: Optional[str] = None
+    available_datasets: List[str] = Field(default_factory=list)
 
