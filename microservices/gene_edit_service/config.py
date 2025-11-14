@@ -16,7 +16,7 @@ MICROSERVICES_DIR = BASE_DIR.parent
 # Service paths
 GRAPH_CRISPR_DIR = MICROSERVICES_DIR / "Graph-CRISPR"
 DNABERT_DIR = MICROSERVICES_DIR / "DNABERT"
-BIM_FILE_PATH = MICROSERVICES_DIR / "8652_Hybrid.bim"
+BIM_FILE_PATH = MICROSERVICES_DIR / "data/maize.bim"
 
 # Configuration from environment variables
 GRAPH_CRISPR_CONFIG_PATH = os.getenv(
