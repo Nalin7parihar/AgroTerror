@@ -1,0 +1,150 @@
+'use client';
+
+import { useRouter } from 'next/navigation';
+import { useState, useEffect } from 'react';
+import { MessageSquare, Workflow, BookOpen, GraduationCap, FileText, X, LogOut } from 'lucide-react';
+import { Button } from '../ui/Button';
+import Link from 'next/link';
+import { getAuthToken, removeAuthToken } from '@/lib/api';
+
+const quickLinks = [
+  {
+    icon: <MessageSquare className="w-5 h-5" />,
+    title: 'AI Tutor',
+    href: '/dashboard/chatbot',
+    color: 'primary',
+  },
+  {
+    icon: <BookOpen className="w-5 h-5" />,
+    title: 'Resources',
+    href: '#',
+    color: 'primary',
+  },
+  {
+    icon: <FileText className="w-5 h-5" />,
+    title: 'Docs',
+    href: '#',
+    color: 'accent',
+  },
+];
+
+export function OnboardingHeader() {
+  const router = useRouter();
+  const [isAuthenticated, setIsAuthenticated] = useState(false);
+
+  useEffect(() => {
+    // Check if user is authenticated
+    const token = getAuthToken();
+    setIsAuthenticated(!!token);
+  }, []);
+
+  const handleLogout = () => {
+    removeAuthToken();
+    setIsAuthenticated(false);
+    router.push('/login');
+  };
+
+  return (
+    <header className="sticky top-0 z-40 bg-background/95 backdrop-blur-md border-b border-secondary/20 shadow-sm">
+      <div className="container mx-auto px-4 sm:px-6 lg:px-8">
+        <div className="flex items-center justify-between h-16">
+          <div className="flex items-center">
+            <Link href="/home" className="text-2xl font-bold text-primary hover:text-primary/80 transition-colors">
+              AgrIQ
+            </Link>
+          </div>
+          
+          {/* Desktop Navigation */}
+          <nav className="hidden md:flex items-center gap-2">
+            {quickLinks.map((link, index) => {
+              const isPrimary = link.color === 'primary';
+              return (
+                <Button
+                  key={index}
+                  variant="outline"
+                  size="sm"
+                  onClick={() => {
+                    if (link.href.startsWith('/')) {
+                      router.push(link.href);
+                    } else {
+                      console.log(`Navigate to ${link.title}`);
+                    }
+                  }}
+                  className={`flex items-center gap-2 ${
+                    isPrimary ? 'border-primary text-primary hover:bg-primary hover:text-background' : 'border-accent text-accent hover:bg-accent hover:text-background'
+                  }`}
+                >
+                  {link.icon}
+                  <span>{link.title}</span>
+                </Button>
+              );
+            })}
+          </nav>
+          
+          {/* Right Side Actions */}
+          <div className="flex items-center gap-3">
+            {isAuthenticated ? (
+              <>
+                <Button
+                  variant="primary"
+                  size="sm"
+                  className="hidden sm:flex"
+                  onClick={() => router.push('/dashboard')}
+                >
+                  Start Project
+                </Button>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  className="flex items-center gap-2"
+                  onClick={handleLogout}
+                >
+                  <LogOut className="w-4 h-4" />
+                  <span className="hidden sm:inline">Logout</span>
+                </Button>
+              </>
+            ) : (
+              <>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  className="hidden sm:flex"
+                  onClick={() => router.push('/login')}
+                >
+                  Sign In
+                </Button>
+                <Button
+                  variant="primary"
+                  size="sm"
+                  className="flex items-center gap-2"
+                  onClick={() => router.push('/register')}
+                >
+                  <span>Sign Up</span>
+                </Button>
+              </>
+            )}
+            
+            {/* Mobile menu */}
+            <div className="md:hidden flex items-center gap-2 ml-2">
+              {quickLinks.slice(0, 2).map((link, index) => (
+                <button
+                  key={index}
+                  className="p-2 text-text/60 hover:text-primary transition-colors"
+                  onClick={() => {
+                    if (link.href.startsWith('/')) {
+                      router.push(link.href);
+                    } else {
+                      console.log(`Navigate to ${link.title}`);
+                    }
+                  }}
+                >
+                  {link.icon}
+                </button>
+              ))}
+            </div>
+          </div>
+        </div>
+      </div>
+    </header>
+  );
+}
