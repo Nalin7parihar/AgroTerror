@@ -56,13 +56,13 @@ function DNAStrandModel({
         const isEdited = isEditing && index >= points.length * 0.4 && index <= points.length * 0.6;
         return (
           <mesh key={index} position={point}>
-            <sphereGeometry args={[0.12, 12, 12]} />
+            <sphereGeometry args={[0.1, 16, 16]} />
             <meshStandardMaterial 
               color={isEdited ? accentColor : color}
               emissive={isEdited ? accentColor : color}
-              emissiveIntensity={isEdited ? 0.8 : 0.4}
-              metalness={0.5}
-              roughness={0.3}
+              emissiveIntensity={isEdited ? 0.9 : 0.5}
+              metalness={0.6}
+              roughness={0.2}
             />
           </mesh>
         );
@@ -77,11 +77,13 @@ function DNAStrandModel({
         
         return (
           <mesh key={`conn-${index}`} position={midPoint}>
-            <cylinderGeometry args={[0.06, 0.06, length, 8]} />
+            <cylinderGeometry args={[0.05, 0.05, length, 12]} />
             <meshStandardMaterial 
               color={color}
               emissive={color}
-              emissiveIntensity={0.3}
+              emissiveIntensity={0.4}
+              metalness={0.4}
+              roughness={0.3}
             />
           </mesh>
         );
@@ -119,9 +121,9 @@ function DNAEditingScene({ isPlaying, progress }: { isPlaying: boolean; progress
     const p1: THREE.Vector3[] = [];
     const p2: THREE.Vector3[] = [];
     
-    const numSegments = 16;
-    const radius = 0.8;
-    const height = 3;
+    const numSegments = 20;
+    const radius = 0.7;
+    const height = 2.5;
     
     for (let i = 0; i <= numSegments; i++) {
       const t = i / numSegments;
@@ -138,18 +140,19 @@ function DNAEditingScene({ isPlaying, progress }: { isPlaying: boolean; progress
   const editProgress = isPlaying ? Math.min(progress, 1) : 0;
   const isEditing = editProgress > 0;
 
+  // Base pair colors from analysis page
+  const basePairColors = ['#00ff88', '#ff0088', '#00d4ff', '#ffaa00']; // adenine, thymine, cytosine, guanine
+  
   const getPrimaryColor = () => {
-    if (typeof window === 'undefined') return '#00bf63';
-    return getComputedStyle(document.documentElement)
-      .getPropertyValue('--primary')
-      .trim() || '#00bf63';
+    return basePairColors[2]; // cytosine - cyan/blue for strand 1
   };
 
   const getSecondaryColor = () => {
-    if (typeof window === 'undefined') return '#42ffa4';
-    return getComputedStyle(document.documentElement)
-      .getPropertyValue('--secondary')
-      .trim() || '#42ffa4';
+    return basePairColors[3]; // guanine - orange/yellow for strand 2
+  };
+  
+  const getBasePairColor = (index: number) => {
+    return basePairColors[index % 4];
   };
 
   return (
@@ -167,20 +170,23 @@ function DNAEditingScene({ isPlaying, progress }: { isPlaying: boolean; progress
         editProgress={editProgress}
       />
       
-      {/* Base pairs */}
+      {/* Base pairs with alternating colors */}
       {points.map((point1, index) => {
         if (index >= points2.length) return null;
         const point2 = points2[index];
         const midPoint = new THREE.Vector3().addVectors(point1, point2).multiplyScalar(0.5);
         const distance = point1.distanceTo(point2);
+        const baseColor = getBasePairColor(index);
         
         return (
           <mesh key={`basepair-${index}`} position={midPoint}>
-            <cylinderGeometry args={[0.02, 0.02, distance, 8]} />
+            <cylinderGeometry args={[0.025, 0.025, distance, 12]} />
             <meshStandardMaterial 
-              color={getPrimaryColor()}
-              emissive={getPrimaryColor()}
-              emissiveIntensity={0.2}
+              color={baseColor}
+              emissive={baseColor}
+              emissiveIntensity={0.5}
+              metalness={0.3}
+              roughness={0.4}
             />
           </mesh>
         );
@@ -206,7 +212,7 @@ export function RealTimeDNAEditing({
   onProgressChange?: (progress: number) => void;
 }) {
   const [progress, setProgress] = useState(0);
-  const animationRef = useRef<number>();
+  const animationRef = useRef<number | undefined>(undefined);
 
   useEffect(() => {
     if (isPlaying) {
@@ -223,7 +229,7 @@ export function RealTimeDNAEditing({
         });
         animationRef.current = requestAnimationFrame(animate);
       };
-      animate();
+      animationRef.current = requestAnimationFrame(animate);
     } else {
       if (animationRef.current) {
         cancelAnimationFrame(animationRef.current);
@@ -245,7 +251,7 @@ export function RealTimeDNAEditing({
 
   if (!mounted) {
     return (
-      <div className={`w-full h-full ${className} flex items-center justify-center bg-secondary/10 rounded-lg`}>
+      <div className={`w-full h-full ${className} flex items-center justify-center bg-transparent`}>
         <div className="text-center">
           <div className="w-16 h-16 border-4 border-primary border-t-transparent rounded-full animate-spin mx-auto mb-2" />
           <p className="text-sm text-text/50">Loading simulation...</p>
@@ -255,27 +261,66 @@ export function RealTimeDNAEditing({
   }
 
   return (
-    <div className={`w-full h-full ${className}`} style={{ minHeight: '400px', minWidth: '100%', position: 'relative' }}>
+    <div 
+      className={`w-full h-full ${className}`} 
+      style={{ 
+        minHeight: '300px',
+        width: '100%',
+        height: '100%',
+        position: 'relative',
+        backgroundColor: 'transparent',
+        overflow: 'hidden'
+      }}
+    >
       <Canvas
         gl={{ 
           antialias: true, 
           alpha: true,
-          powerPreference: "high-performance"
+          powerPreference: "high-performance",
+          preserveDrawingBuffer: false,
+          toneMappingExposure: 1.2,
+          premultipliedAlpha: false
         }}
-        dpr={[1, 1.5]}
+        dpr={[1, 2]}
         onCreated={({ gl }) => {
-          gl.setClearColor('#00000000', 0);
+          gl.setClearColor(0x000000, 0);
+          gl.shadowMap.enabled = true;
+          gl.shadowMap.type = 2;
+          gl.domElement.style.background = 'transparent';
+          gl.domElement.style.width = '100%';
+          gl.domElement.style.height = '100%';
         }}
-        style={{ width: '100%', height: '100%', display: 'block' }}
+        style={{ 
+          width: '100%', 
+          height: '100%', 
+          display: 'block',
+          position: 'absolute',
+          top: 0,
+          left: 0,
+          background: 'transparent',
+          backgroundColor: 'transparent',
+          outline: 'none',
+          border: 'none',
+          margin: 0,
+          padding: 0,
+          touchAction: 'none'
+        }}
       >
-        <PerspectiveCamera makeDefault position={[0, 2, 6]} fov={50} />
+        <PerspectiveCamera makeDefault position={[0, 1.5, 5.5]} fov={45} />
         
-        {/* Lighting */}
-        <ambientLight intensity={0.8} />
-        <pointLight position={[10, 10, 10]} intensity={1.2} />
-        <pointLight position={[-10, -10, -10]} intensity={0.6} color="#42ffa4" />
-        <directionalLight position={[0, 5, 5]} intensity={0.9} />
-        <spotLight position={[0, 5, 5]} angle={0.3} penumbra={1} intensity={0.5} />
+        {/* Enhanced RGB lighting setup */}
+        {/* Blue key light */}
+        <directionalLight position={[4, 5, 4]} intensity={0.9} color="#3b82f6" />
+        {/* Red fill light */}
+        <directionalLight position={[-4, 3, 3]} intensity={0.6} color="#ef4444" />
+        {/* Green accent */}
+        <pointLight position={[3, 2, 4]} intensity={0.7} color="#10b981" />
+        {/* Blue rim */}
+        <pointLight position={[-2, 1, -4]} intensity={0.8} color="#3b82f6" />
+        {/* Red bottom */}
+        <pointLight position={[0, -3, 2]} intensity={0.5} color="#ef4444" />
+        {/* Ambient blend */}
+        <ambientLight intensity={0.3} color="#ffffff" />
         
         {/* DNA Editing Scene */}
         <DNAEditingScene isPlaying={isPlaying} progress={progress} />
@@ -287,7 +332,8 @@ export function RealTimeDNAEditing({
           autoRotate={!isPlaying}
           autoRotateSpeed={0.5}
           minDistance={4}
-          maxDistance={12}
+          maxDistance={10}
+          target={[0, 0, 0]}
         />
       </Canvas>
     </div>

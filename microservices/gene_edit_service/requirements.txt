@@ -20,3 +20,7 @@ requests>=2.31.0
 # Optional: for better performance
 orjson>=3.9.0
 
+# Redis for caching
+redis>=5.0.0
+hiredis>=2.2.0
+
