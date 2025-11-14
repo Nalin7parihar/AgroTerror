@@ -1,6 +1,7 @@
 import google.generativeai as genai
 from core.config import settings
 from schemas.llm import LLMQueryRequest, LLMQueryResponse, DifficultyLevel, Language
+from services.cache import get_cached_response, cache_response
 import logging
 import asyncio
 
@@ -31,57 +32,45 @@ def get_system_prompt(difficulty: DifficultyLevel, language: Language, allow_cod
     
     difficulty_instructions = {
         DifficultyLevel.BASIC: f"""
-You are an expert biology educator explaining gene editing concepts in {lang_name} at a BASIC level.
+Explain gene editing concepts in {lang_name} at a BASIC level.
 - Use simple, everyday language
-- Avoid technical jargon or explain it immediately when used
-- Use analogies and real-world examples
-- Break down complex concepts into smaller, digestible parts
-- Target audience: General public, students new to biology
+- Explain technical terms briefly when needed
+- Be direct and concise - get to the point quickly
+- Use 1-2 brief examples if helpful
+- Keep explanations focused and avoid unnecessary detail
 {code_mixing_note}
 """,
         DifficultyLevel.INTERMEDIATE: f"""
-You are an expert biology educator explaining gene editing concepts in {lang_name} at an INTERMEDIATE level.
-- Use some technical terms but explain them clearly
-- Provide context and background information
-- Use examples from real-world applications
-- Balance simplicity with scientific accuracy
-- Target audience: Students with basic biology knowledge, interested general public
+Explain gene editing concepts in {lang_name} at an INTERMEDIATE level.
+- Use appropriate technical terms with brief explanations
+- Provide essential context only
+- Be concise while maintaining scientific accuracy
+- Focus on answering the question directly
 {code_mixing_note}
 """,
         DifficultyLevel.ADVANCED: f"""
-You are an expert researcher explaining gene editing concepts in {lang_name} at an ADVANCED level.
+Explain gene editing concepts in {lang_name} at an ADVANCED level.
 - Use proper scientific terminology
-- Include detailed mechanisms and processes
-- Reference current research and methodologies
-- Discuss technical nuances and limitations
-- Target audience: Researchers, graduate students, professionals in biotechnology
+- Focus on key mechanisms and processes
+- Be precise and concise
+- Address the question directly without excessive background
 {code_mixing_note}
 """
     }
     
     base_prompt = f"""
-You are an AI assistant specialized in explaining gene editing, CRISPR technology, and related biology concepts.
-
-Your expertise includes:
-1. Basic Biology: DNA, genes, chromosomes, mutations, proteins, cells
-2. Gene Editing: CRISPR-Cas9, guide RNA (gRNA), DNA repair mechanisms, gene knockouts, gene knock-ins
-3. CRISPR Applications in Crops: Crop improvement, disease resistance, yield enhancement, drought tolerance, nutritional enhancement
-4. Benefits: Increased yield, disease resistance, reduced pesticide use, climate resilience, nutritional improvements
-5. Risks & Ethics: Off-target effects, environmental concerns, regulatory issues, ethical considerations, GMO debates
-6. Scientific Terms: Ability to explain complex terminology in accessible ways
+You are an expert assistant explaining gene editing, CRISPR technology, and related biology concepts.
 
 {difficulty_instructions[difficulty]}
 
-IMPORTANT GUIDELINES:
-- The user's question may be in English, Hindi (हिंदी), or Kannada (ಕನ್ನಡ) - understand and respond appropriately
-- Always respond in {lang_name}
+RESPONSE GUIDELINES:
+- Respond in {lang_name} (understand questions in English, Hindi, or Kannada)
+- By default, be concise and direct - answer the question without unnecessary elaboration
+- However, if the user explicitly requests more detail, simpler explanations, or specific depth (e.g., "explain like I'm 10", "tell me more", "go into detail", "simplify this"), adapt your response accordingly
+- Focus on the core answer first, add context based on the user's request
+- Use clear, structured format (paragraphs or brief lists)
 - Be accurate and scientifically sound
-- If asked about risks or ethics, present balanced perspectives
-- Use examples relevant to agriculture and crop improvement when appropriate
-- If the question is unclear, ask for clarification
-- If you don't know something, admit it rather than guessing
-- Structure your response clearly with paragraphs
-- Use bullet points or numbered lists when helpful
+- If uncertain, acknowledge it briefly
 """
     
     return base_prompt
@@ -89,9 +78,18 @@ IMPORTANT GUIDELINES:
 
 async def generate_response(request: LLMQueryRequest) -> LLMQueryResponse:
     """
-    Generate a response using Gemini LLM based on the query request
+    Generate a response using Gemini LLM based on the query request.
+    Checks cache first, then generates and caches the response if not found.
     """
     try:
+        # Check cache first
+        cached_response = await get_cached_response(request)
+        if cached_response:
+            logger.info("Returning cached LLM response")
+            return cached_response
+        
+        # Cache miss - generate new response
+        logger.info("Cache miss - generating new LLM response")
         system_prompt = get_system_prompt(
             request.difficulty,
             request.language,
@@ -110,12 +108,17 @@ async def generate_response(request: LLMQueryRequest) -> LLMQueryResponse:
         
         answer = response.text.strip()
         
-        return LLMQueryResponse(
+        llm_response = LLMQueryResponse(
             answer=answer,
             question=request.question,
             difficulty=request.difficulty,
             language=request.language
         )
+        
+        # Cache the response for future requests
+        await cache_response(request, llm_response)
+        
+        return llm_response
     
     except Exception as e:
         logger.error(f"Error generating Gemini response: {str(e)}")
