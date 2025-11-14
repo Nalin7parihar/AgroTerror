@@ -1,4 +1,4 @@
-from fastapi import Depends, HTTPException, status
+from fastapi import Depends, HTTPException, status, Request
 from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
 from jose import JWTError, jwt
 from bson import ObjectId
@@ -10,11 +10,13 @@ from motor.motor_asyncio import AsyncIOMotorDatabase
 security = HTTPBearer()
 
 async def get_current_user(
+    request: Request,
     credentials: HTTPAuthorizationCredentials = Depends(security),
     db: AsyncIOMotorDatabase = Depends(get_db)
 ) -> User:
     """
     Dependency to get the current authenticated user from JWT token
+    Also stores user_id in request state for rate limiting
     """
     credentials_exception = HTTPException(
         status_code=status.HTTP_401_UNAUTHORIZED,
@@ -30,6 +32,9 @@ async def get_current_user(
         user_id: str = payload.get("sub")
         if user_id is None:
             raise credentials_exception
+        
+        # Store user_id in request state for rate limiting
+        request.state.user_id = user_id
     except JWTError:
         raise credentials_exception
     
