@@ -42,26 +42,47 @@ function DNAStrandModel({
 
   // Apply editing effect to points - only when there's an actual edit position
   const editedPoints = useMemo(() => {
+    // Safety check: ensure we have valid points
+    if (!points || points.length === 0) return [];
+    
     // Only apply editing effect if there's an edit position and we're actually editing
-    if (!isEditing || editProgress === 0 || editPosition === undefined) return points;
+    if (!isEditing || editProgress === 0 || editPosition === undefined || !isFinite(editPosition)) {
+      return points.map(p => p ? p.clone() : new THREE.Vector3(0, 0, 0));
+    }
+    
+    // Safety check: ensure points.length is valid for division
+    if (points.length <= 1) {
+      return points.map(p => p ? p.clone() : new THREE.Vector3(0, 0, 0));
+    }
     
     // Find the index range around the edit position (smaller, more localized effect)
-    const editIndex = Math.floor((editPosition / (points.length - 1)) * points.length);
+    const editIndex = Math.floor(Math.max(0, Math.min((editPosition / (points.length - 1)) * points.length, points.length - 1)));
     const effectRange = Math.max(3, Math.floor(points.length * 0.1)); // 10% of strand or at least 3 points
     const startIndex = Math.max(0, editIndex - effectRange);
     const endIndex = Math.min(points.length - 1, editIndex + effectRange);
     
     return points.map((point, index) => {
-      if (index >= startIndex && index <= endIndex) {
+      // Safety check: ensure point is valid
+      if (!point || !isFinite(point.x) || !isFinite(point.y) || !isFinite(point.z)) {
+        return new THREE.Vector3(0, 0, 0);
+      }
+      
+      if (index >= startIndex && index <= endIndex && effectRange > 0) {
         // Smooth falloff effect centered on edit position
         const distanceFromEdit = Math.abs(index - editIndex) / effectRange;
-        const falloff = Math.max(0, 1 - distanceFromEdit);
-        const editAmount = Math.sin(falloff * Math.PI) * editProgress * 0.15; // Reduced from 0.3 to 0.15
-        return new THREE.Vector3(
-          point.x + editAmount * 0.5, // Reduced movement
-          point.y,
-          point.z + editAmount * 0.3  // Reduced movement
-        );
+        const falloff = Math.max(0, Math.min(1, 1 - distanceFromEdit));
+        const editAmount = Math.sin(falloff * Math.PI) * Math.max(0, Math.min(1, editProgress)) * 0.15;
+        
+        // Ensure all calculated values are finite
+        const newX = point.x + editAmount * 0.5;
+        const newY = point.y;
+        const newZ = point.z + editAmount * 0.3;
+        
+        if (!isFinite(newX) || !isFinite(newY) || !isFinite(newZ)) {
+          return point.clone();
+        }
+        
+        return new THREE.Vector3(newX, newY, newZ);
       }
       return point.clone();
     });
@@ -75,10 +96,18 @@ function DNAStrandModel({
     <group ref={groupRef}>
       {/* Render spheres for each point */}
       {editedPoints.map((point, index) => {
+        // Safety check: ensure point is valid
+        if (!point || !isFinite(point.x) || !isFinite(point.y) || !isFinite(point.z)) {
+          return null;
+        }
+        
         // Only highlight as edited if there's an actual edit position
-        const editIndex = editPosition !== undefined ? Math.floor((editPosition / (points.length - 1)) * points.length) : -1;
-        const effectRange = Math.max(3, Math.floor(points.length * 0.1));
-        const isEdited = isEditing && editPosition !== undefined && 
+        let editIndex = -1;
+        if (editPosition !== undefined && points.length > 1 && isFinite(editPosition)) {
+          editIndex = Math.floor(Math.max(0, Math.min((editPosition / (points.length - 1)) * points.length, points.length - 1)));
+        }
+        const effectRange = points.length > 0 ? Math.max(3, Math.floor(points.length * 0.1)) : 3;
+        const isEdited = isEditing && editPosition !== undefined && editIndex >= 0 &&
           index >= Math.max(0, editIndex - effectRange) && 
           index <= Math.min(points.length - 1, editIndex + effectRange);
         // Use nucleotide-specific color if available, otherwise use default
@@ -100,9 +129,29 @@ function DNAStrandModel({
       {/* Connect points with cylinders */}
       {editedPoints.slice(0, -1).map((point, index) => {
         const nextPoint = editedPoints[index + 1];
+        
+        // Safety checks: ensure points are valid
+        if (!point || !nextPoint || 
+            !isFinite(point.x) || !isFinite(point.y) || !isFinite(point.z) ||
+            !isFinite(nextPoint.x) || !isFinite(nextPoint.y) || !isFinite(nextPoint.z)) {
+          return null;
+        }
+        
         const direction = new THREE.Vector3().subVectors(nextPoint, point);
         const length = direction.length();
+        
+        // Safety check: ensure length is valid
+        if (!isFinite(length) || length <= 0) {
+          return null;
+        }
+        
         const midPoint = new THREE.Vector3().addVectors(point, nextPoint).multiplyScalar(0.5);
+        
+        // Final safety check: ensure midPoint is valid
+        if (!isFinite(midPoint.x) || !isFinite(midPoint.y) || !isFinite(midPoint.z)) {
+          return null;
+        }
+        
         // Use color from first point of the connection
         const connectionColor = nucleotideColors[index] || color;
         
@@ -173,6 +222,9 @@ function DNAEditingScene({
     return complement[base.toUpperCase()] || 'T';
   };
 
+  // Validate progress value before using it
+  const safeProgressValue = isFinite(progress) && !isNaN(progress) ? Math.max(0, Math.min(progress, 1)) : 0;
+  
   const { points, points2, nucleotideColors1, nucleotideColors2, basePairColors } = useMemo(() => {
     const p1: THREE.Vector3[] = [];
     const p2: THREE.Vector3[] = [];
@@ -181,28 +233,44 @@ function DNAEditingScene({
     const bpColors: string[] = [];
     
     // Determine number of segments based on sequence length or default
-    const seqLength = dnaSequence.length || 20;
+    const seqLength = dnaSequence?.length || 20;
     const numSegments = Math.max(seqLength, 20);
     const radius = 0.7;
     const height = 2.5;
     
+    // Safety check: ensure we have valid segments
+    if (numSegments <= 0 || !isFinite(numSegments)) {
+      return { points: p1, points2: p2, nucleotideColors1: colors1, nucleotideColors2: colors2, basePairColors: bpColors };
+    }
+    
     // Generate colors from sequence
     for (let i = 0; i <= numSegments; i++) {
-      const t = i / numSegments;
+      const t = numSegments > 0 ? i / numSegments : 0;
       const angle = t * Math.PI * 3;
       const y = (t - 0.5) * height;
       
-      p1.push(new THREE.Vector3(Math.cos(angle) * radius, y, Math.sin(angle) * radius));
-      p2.push(new THREE.Vector3(Math.cos(angle + Math.PI) * radius, y, Math.sin(angle + Math.PI) * radius));
+      // Ensure all values are valid numbers
+      const x1 = Math.cos(angle) * radius;
+      const z1 = Math.sin(angle) * radius;
+      const x2 = Math.cos(angle + Math.PI) * radius;
+      const z2 = Math.sin(angle + Math.PI) * radius;
+      
+      // Validate values before creating Vector3
+      if (!isFinite(x1) || !isFinite(y) || !isFinite(z1) || !isFinite(x2) || !isFinite(z2)) {
+        continue;
+      }
+      
+      p1.push(new THREE.Vector3(x1, y, z1));
+      p2.push(new THREE.Vector3(x2, y, z2));
       
       // Get nucleotide color from sequence
-      const seqIndex = Math.floor((i / numSegments) * seqLength);
-      const nucleotide1 = dnaSequence[seqIndex]?.toUpperCase() || 'A';
+      const seqIndex = seqLength > 0 ? Math.floor(Math.min((i / numSegments) * seqLength, seqLength - 1)) : 0;
+      const nucleotide1 = dnaSequence?.[seqIndex]?.toUpperCase() || 'A';
       const nucleotide2 = getComplementaryBase(nucleotide1);
       
       // If this is the edit position and we're editing, use target base color
       let color1: string;
-      if (editPosition !== undefined && seqIndex === editPosition && progress > 0) {
+      if (editPosition !== undefined && isFinite(editPosition) && seqIndex === editPosition && safeProgressValue > 0 && safeProgressValue <= 1) {
         color1 = NUCLEOTIDE_COLORS[targetBase?.toUpperCase() || nucleotide1] || NUCLEOTIDE_COLORS[nucleotide1];
       } else {
         color1 = NUCLEOTIDE_COLORS[nucleotide1] || NUCLEOTIDE_COLORS['A'];
@@ -216,10 +284,11 @@ function DNAEditingScene({
     }
     
     return { points: p1, points2: p2, nucleotideColors1: colors1, nucleotideColors2: colors2, basePairColors: bpColors };
-  }, [dnaSequence, editPosition, targetBase, progress]);
+  }, [dnaSequence, editPosition, targetBase, safeProgressValue]);
 
-  const editProgress = isPlaying ? Math.min(progress, 1) : 0;
-  const isEditing = editProgress > 0;
+  // Ensure progress is valid and finite (reuse the validated value from useMemo)
+  const editProgress = isPlaying ? safeProgressValue : 0;
+  const isEditing = editProgress > 0 && isFinite(editProgress);
 
   // Default fallback colors
   const getPrimaryColor = () => {
@@ -253,8 +322,23 @@ function DNAEditingScene({
       {points.map((point1, index) => {
         if (index >= points2.length) return null;
         const point2 = points2[index];
+        
+        // Safety checks: ensure points are valid
+        if (!point1 || !point2 ||
+            !isFinite(point1.x) || !isFinite(point1.y) || !isFinite(point1.z) ||
+            !isFinite(point2.x) || !isFinite(point2.y) || !isFinite(point2.z)) {
+          return null;
+        }
+        
         const midPoint = new THREE.Vector3().addVectors(point1, point2).multiplyScalar(0.5);
         const distance = point1.distanceTo(point2);
+        
+        // Safety check: ensure distance and midPoint are valid
+        if (!isFinite(distance) || distance <= 0 ||
+            !isFinite(midPoint.x) || !isFinite(midPoint.y) || !isFinite(midPoint.z)) {
+          return null;
+        }
+        
         // Use the color from the first strand for the base pair
         const baseColor = basePairColors[index] || nucleotideColors1[index] || getPrimaryColor();
         
@@ -272,15 +356,41 @@ function DNAEditingScene({
         );
       })}
       
-      {isEditing && editPosition !== undefined && dnaSequence && (
-        <CRISPRProtein 
-          position={[
-            points[Math.floor((editPosition / dnaSequence.length) * points.length)]?.x || 0,
-            points[Math.floor((editPosition / dnaSequence.length) * points.length)]?.y || (editProgress - 0.5) * 2.5,
-            points[Math.floor((editPosition / dnaSequence.length) * points.length)]?.z || 1.2
-          ]} 
-          isActive={isPlaying}
-        />
+      {isEditing && editPosition !== undefined && dnaSequence && dnaSequence.length > 0 && points.length > 0 && (
+        (() => {
+          // Safety check: ensure valid edit position and sequence length
+          if (!isFinite(editPosition) || editPosition < 0 || editPosition >= dnaSequence.length) {
+            return null;
+          }
+          
+          const pointIndex = Math.floor(Math.max(0, Math.min((editPosition / dnaSequence.length) * points.length, points.length - 1)));
+          const editPoint = points[pointIndex];
+          
+          // Safety check: ensure point is valid
+          if (!editPoint || !isFinite(editPoint.x) || !isFinite(editPoint.y) || !isFinite(editPoint.z)) {
+            return null;
+          }
+          
+          const yPos = isFinite(editPoint.y) ? editPoint.y : ((editProgress - 0.5) * 2.5);
+          
+          // Final validation of position array
+          const position: [number, number, number] = [
+            isFinite(editPoint.x) ? editPoint.x : 0,
+            isFinite(yPos) ? yPos : 0,
+            isFinite(editPoint.z) ? editPoint.z : 1.2
+          ];
+          
+          if (!isFinite(position[0]) || !isFinite(position[1]) || !isFinite(position[2])) {
+            return null;
+          }
+          
+          return (
+            <CRISPRProtein 
+              position={position}
+              isActive={isPlaying}
+            />
+          );
+        })()
       )}
     </>
   );
@@ -310,14 +420,19 @@ export function RealTimeDNAEditing({
     if (isPlaying) {
       const animate = () => {
         setProgress((prev) => {
-          const newProgress = prev + 0.01;
+          // Safety check: ensure prev is valid
+          const safePrev = isFinite(prev) && !isNaN(prev) ? prev : 0;
+          const newProgress = safePrev + 0.01;
+          
+          // Safety check: ensure newProgress is valid
+          if (!isFinite(newProgress) || isNaN(newProgress)) {
+            return 0;
+          }
+          
           if (newProgress >= 1) {
             return 0; // Loop
           }
-          if (onProgressChange) {
-            onProgressChange(newProgress);
-          }
-          return newProgress;
+          return Math.max(0, Math.min(newProgress, 1)); // Clamp between 0 and 1
         });
         animationRef.current = requestAnimationFrame(animate);
       };
@@ -333,7 +448,16 @@ export function RealTimeDNAEditing({
         cancelAnimationFrame(animationRef.current);
       }
     };
-  }, [isPlaying, onProgressChange]);
+  }, [isPlaying]);
+
+  // Call onProgressChange after progress state updates (outside of render phase)
+  useEffect(() => {
+    if (onProgressChange) {
+      // Safety check: ensure progress is valid before calling callback
+      const safeProgress = isFinite(progress) && !isNaN(progress) ? Math.max(0, Math.min(progress, 1)) : 0;
+      onProgressChange(safeProgress);
+    }
+  }, [progress, onProgressChange]);
 
   const [mounted, setMounted] = useState(false);
 

@@ -143,16 +143,7 @@ export default function ResourcesPage() {
       <main className="min-h-screen bg-background">
         <div className="container mx-auto px-4 sm:px-6 lg:px-8 py-8">
           {/* Header */}
-          <div className="mb-8">
-            <Button
-              variant="outline"
-              size="sm"
-              onClick={() => router.push('/home')}
-              className="mb-4"
-            >
-              <ArrowLeft className="w-4 h-4 mr-2" />
-              Back to Home
-            </Button>
+          <div className="mb-8">    
             <div className="flex items-center gap-3 mb-4">
               <div className="p-3 rounded-lg bg-primary/10 text-primary">
                 <BookOpen className="w-8 h-8" />

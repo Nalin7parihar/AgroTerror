@@ -122,6 +122,7 @@ async def analyze_gene_edits(
         response_data = {
             "analysis_id": analysis_id,
             "request_id": microservice_response.get("request_id", analysis_id),
+            "dna_sequence": analysis_request.dna_sequence,
             "edit_suggestions": microservice_response.get("edit_suggestions", []),
             "dnabert_validations": microservice_response.get("dnabert_validations", []),
             "snp_changes": microservice_response.get("snp_changes", []),
@@ -229,6 +230,7 @@ async def get_analysis_detail(
         return GeneAnalysisResponse(
             analysis_id=str(analysis["_id"]),
             request_id=analysis.get("request_id", str(analysis["_id"])),
+            dna_sequence=analysis.get("dna_sequence", ""),
             edit_suggestions=analysis.get("edit_suggestions", []),
             dnabert_validations=analysis.get("dnabert_validations", []),
             snp_changes=analysis.get("snp_changes", []),

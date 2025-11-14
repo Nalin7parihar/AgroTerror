@@ -74,6 +74,7 @@ class GeneAnalysisResponse(BaseModel):
     """Response model for gene analysis"""
     analysis_id: str
     request_id: str
+    dna_sequence: Optional[str] = None
     edit_suggestions: List[EditSuggestion]
     dnabert_validations: List[DNABERTValidation]
     snp_changes: List[SNPChange]

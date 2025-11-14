@@ -125,6 +125,10 @@ const DNALab3D = () => {
     try {
       const detail = await getAnalysisDetail(analysisId);
       setAnalysisResult(detail);
+      // Update DNA sequence from the analysis result if available
+      if (detail.dna_sequence) {
+        setDnaSequence(detail.dna_sequence);
+      }
       setSelectedAnalysisId(analysisId);
       setShowHistory(false);
       setProgress(1);
@@ -618,11 +622,14 @@ const DNALab3D = () => {
                   isPlaying={isPlaying && analysisResult !== null}
                   onProgressChange={setProgress}
                   dnaSequence={(() => {
-                    if (!analysisResult || !dnaSequence) return '';
-                    if (activeTab === 0) return dnaSequence;
+                    if (!analysisResult) return '';
+                    // Use DNA sequence from analysis result if available, otherwise use form state
+                    const seqToUse = analysisResult.dna_sequence || dnaSequence;
+                    if (!seqToUse) return '';
+                    if (activeTab === 0) return seqToUse;
                     const edit = analysisResult.edit_suggestions[activeTab - 1];
-                    if (!edit) return dnaSequence;
-                    const seq = dnaSequence.split('');
+                    if (!edit) return seqToUse;
+                    const seq = seqToUse.split('');
                     if (seq[edit.target_position]) {
                       seq[edit.target_position] = edit.target_base;
                     }

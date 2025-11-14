@@ -208,15 +208,6 @@ export default function ChatbotPage() {
         <div className="container mx-auto px-4 sm:px-6 lg:px-8 py-8">
           {/* Header */}
           <div className="max-w-7xl mx-auto mb-6">
-            <Button
-              variant="outline"
-              size="sm"
-              onClick={() => router.back()}
-              className="mb-4"
-            >
-              <ArrowLeft className="w-4 h-4 mr-2" />
-              Back
-            </Button>
             <div className="flex items-center gap-3 mb-6">
               <div className="p-3 bg-primary/10 rounded-lg">
                 <Bot className="w-6 h-6 text-primary" />

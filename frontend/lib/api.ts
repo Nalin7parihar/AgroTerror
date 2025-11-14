@@ -178,6 +178,7 @@ export interface EditSummary {
 export interface GeneAnalysisResponse {
   analysis_id: string;
   request_id: string;
+  dna_sequence?: string;
   edit_suggestions: EditSuggestion[];
   dnabert_validations: DNABERTValidation[];
   snp_changes: SNPChange[];
