@@ -1,10 +1,18 @@
-from fastapi import FastAPI
+from fastapi import FastAPI, Request, status
+from fastapi.responses import JSONResponse
 from fastapi.middleware.cors import CORSMiddleware
 from contextlib import asynccontextmanager
+from core.database import connect_to_mongo, close_mongo_connection
+from core.config import settings
+from routers import auth, llm
 
 @asynccontextmanager
 async def lifespan(app : FastAPI):
+    # Startup
+    await connect_to_mongo()
     yield
+    # Shutdown
+    await close_mongo_connection()
     
 app = FastAPI(title="AgroTerror",
               lifespan=lifespan,
@@ -16,11 +24,15 @@ app = FastAPI(title="AgroTerror",
 
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],
+    allow_origins=settings.CORS_ORIGINS,
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
 )
+
+# Include routers
+app.include_router(auth.router)
+app.include_router(llm.router)
 
 @app.get("/")
 async def root():

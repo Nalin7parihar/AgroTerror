@@ -6,5 +6,5 @@ __pycache__
 *.pyw
 *.pyz
 *.pywz
-
+.env
 microservices/8652_Hybrid.bim
