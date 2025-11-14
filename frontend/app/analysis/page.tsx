@@ -1,155 +1,22 @@
 'use client';
 
-import React, { useEffect, useRef, useState } from 'react';
-import { Dna, Microscope, Activity, Zap, Shield, Database, Cpu, Play, Pause } from 'lucide-react';
+import React, { useState } from 'react';
+import { Dna, Microscope, Activity, Zap, Shield, Database, Cpu, Play, Pause, RotateCcw } from 'lucide-react';
+import dynamic from 'next/dynamic';
+
+const RealTimeDNAEditingWrapper = dynamic(
+  () => import('@/components/animations/RealTimeDNAEditingWrapper').then(mod => ({ default: mod.RealTimeDNAEditingWrapper })),
+  { ssr: false, loading: () => <div className="w-full h-full bg-secondary/10 animate-pulse rounded-lg flex items-center justify-center"><p className="text-text/50">Loading simulation...</p></div> }
+);
 
 const DNALab3D = () => {
-  const canvasRef = useRef<HTMLCanvasElement>(null);
-  const [isRotating, setIsRotating] = useState(true);
+  const [isPlaying, setIsPlaying] = useState(false);
+  const [progress, setProgress] = useState(0);
 
-  useEffect(() => {
-    const canvas = canvasRef.current;
-    if (!canvas) return;
-
-    const ctx = canvas.getContext('2d');
-    if (!ctx) return;
-
-    const resize = () => {
-      const rect = canvas.getBoundingClientRect();
-      canvas.width = rect.width * 2;
-      canvas.height = rect.height * 2;
-      ctx.scale(2, 2);
-    };
-
-    resize();
-    window.addEventListener('resize', resize);
-
-    let animationId: number | undefined;
-    let rotation = 0;
-    let time = 0;
-
-    const colors = {
-      adenine: '#00ff88',
-      thymine: '#ff0088',
-      cytosine: '#00d4ff',
-      guanine: '#ffaa00',
-      backbone: '#4a9eff'
-    };
-
-    const baseCount = 24;
-    const helixRadius = 70;
-    const helixHeight = 350;
-    const turns = 3;
-
-    const animate = () => {
-      if (isRotating) {
-        rotation += 0.01;
-        time += 1;
-      }
-
-      const width = canvas.width / 2;
-      const height = canvas.height / 2;
-
-      ctx.clearRect(0, 0, width, height);
-
-      // Grid background - use theme-aware color
-      const gridColor = getComputedStyle(document.documentElement).getPropertyValue('--primary').trim() || '#00bf63';
-      ctx.strokeStyle = gridColor + '15'; // Add transparency
-      ctx.lineWidth = 1;
-      for (let i = 0; i < width; i += 30) {
-        ctx.beginPath();
-        ctx.moveTo(i, 0);
-        ctx.lineTo(i, height);
-        ctx.stroke();
-      }
-      for (let i = 0; i < height; i += 30) {
-        ctx.beginPath();
-        ctx.moveTo(0, i);
-        ctx.lineTo(width, i);
-        ctx.stroke();
-      }
-
-      const segments = [];
-
-      for (let i = 0; i < baseCount; i++) {
-        const t = i / baseCount;
-        const y = (t - 0.5) * helixHeight;
-        const angle1 = rotation + t * Math.PI * 2 * turns;
-        const angle2 = angle1 + Math.PI;
-
-        const wave = Math.sin(time * 0.002 + i * 0.3) * 5;
-
-        const x1 = Math.cos(angle1) * (helixRadius + wave);
-        const z1 = Math.sin(angle1) * (helixRadius + wave);
-        const x2 = Math.cos(angle2) * (helixRadius + wave);
-        const z2 = Math.sin(angle2) * (helixRadius + wave);
-
-        segments.push({ z: (z1 + z2) / 2, i, x1, y, z1, x2, z2 });
-      }
-
-      segments.sort((a, b) => a.z - b.z);
-
-      segments.forEach(seg => {
-        const p1 = 600 / (600 + seg.z1);
-        const sx1 = seg.x1 * p1 + width / 2;
-        const sy1 = seg.y * p1 + height / 2;
-
-        const p2 = 600 / (600 + seg.z2);
-        const sx2 = seg.x2 * p2 + width / 2;
-        const sy2 = seg.y * p2 + height / 2;
-
-        const baseType = seg.i % 4;
-        const color = baseType === 0 ? colors.adenine : baseType === 1 ? colors.thymine : baseType === 2 ? colors.cytosine : colors.guanine;
-
-        // Draw base pair connection with gradient
-        const gradient = ctx.createLinearGradient(sx1, sy1, sx2, sy2);
-        gradient.addColorStop(0, color);
-        gradient.addColorStop(0.5, '#ffffff');
-        gradient.addColorStop(1, color);
-
-        ctx.strokeStyle = gradient;
-        ctx.lineWidth = 2 * Math.min(p1, p2);
-        ctx.shadowBlur = 10;
-        ctx.shadowColor = color;
-        ctx.beginPath();
-        ctx.moveTo(sx1, sy1);
-        ctx.lineTo(sx2, sy2);
-        ctx.stroke();
-        ctx.shadowBlur = 0;
-
-        // Draw backbone nodes - use theme primary color
-        const primaryColor = getComputedStyle(document.documentElement).getPropertyValue('--primary').trim() || '#00bf63';
-        ctx.shadowBlur = 15;
-        ctx.shadowColor = primaryColor;
-        ctx.fillStyle = primaryColor + '80'; // Add transparency
-        ctx.beginPath();
-        ctx.arc(sx1, sy1, 4 * p1, 0, Math.PI * 2);
-        ctx.fill();
-        ctx.beginPath();
-        ctx.arc(sx2, sy2, 4 * p2, 0, Math.PI * 2);
-        ctx.fill();
-        ctx.shadowBlur = 0;
-
-        // Draw base nodes
-        ctx.fillStyle = color;
-        ctx.beginPath();
-        ctx.arc(sx1, sy1, 3 * p1, 0, Math.PI * 2);
-        ctx.fill();
-        ctx.beginPath();
-        ctx.arc(sx2, sy2, 3 * p2, 0, Math.PI * 2);
-        ctx.fill();
-      });
-
-      animationId = requestAnimationFrame(animate);
-    };
-
-    animate();
-
-    return () => {
-      window.removeEventListener('resize', resize);
-      if (animationId) cancelAnimationFrame(animationId);
-    };
-  }, [isRotating]);
+  const handleReset = () => {
+    setIsPlaying(false);
+    setProgress(0);
+  };
 
   return (
     <div className="min-h-screen bg-[var(--background)] text-[var(--text)]">
@@ -246,15 +113,15 @@ const DNALab3D = () => {
               <div className="space-y-3">
                 <div className="flex justify-between items-center p-3 bg-[var(--secondary)]/30 rounded-lg">
                   <span className="text-[var(--text)]/70 text-xs sm:text-sm">Base Pairs</span>
-                  <span className="text-xl sm:text-2xl font-bold text-[var(--primary)]">24</span>
+                  <span className="text-xl sm:text-2xl font-bold text-[var(--primary)]">20</span>
                 </div>
                 <div className="flex justify-between items-center p-3 bg-[var(--secondary)]/30 rounded-lg">
-                  <span className="text-[var(--text)]/70 text-xs sm:text-sm">Helix Turns</span>
-                  <span className="text-xl sm:text-2xl font-bold text-[var(--primary)]">3</span>
+                  <span className="text-[var(--text)]/70 text-xs sm:text-sm">Simulation</span>
+                  <span className="text-xl sm:text-2xl font-bold text-[var(--accent)]">{isPlaying ? 'Active' : 'Paused'}</span>
                 </div>
                 <div className="flex justify-between items-center p-3 bg-[var(--secondary)]/30 rounded-lg">
-                  <span className="text-[var(--text)]/70 text-xs sm:text-sm">Rotation</span>
-                  <span className="text-xl sm:text-2xl font-bold text-[var(--accent)]">{isRotating ? 'Active' : 'Paused'}</span>
+                  <span className="text-[var(--text)]/70 text-xs sm:text-sm">Progress</span>
+                  <span className="text-xl sm:text-2xl font-bold text-[var(--primary)]">{Math.round(progress * 100)}%</span>
                 </div>
               </div>
             </div>
@@ -293,25 +160,66 @@ const DNALab3D = () => {
               <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 mb-4">
                 <div className="flex items-center gap-3">
                   <Dna className="w-5 h-5 sm:w-6 sm:h-6 text-[var(--primary)]" />
-                  <h2 className="text-lg sm:text-xl font-bold">3D DNA Helix Visualization</h2>
+                  <h2 className="text-lg sm:text-xl font-bold">3D DNA Editing Simulation</h2>
                 </div>
-                <button
-                  onClick={() => setIsRotating(!isRotating)}
-                  className="p-2 sm:p-3 bg-[var(--primary)]/20 hover:bg-[var(--primary)]/30 rounded-lg transition"
-                  aria-label={isRotating ? 'Pause animation' : 'Play animation'}
-                >
-                  {isRotating ? <Pause className="w-4 h-4 sm:w-5 sm:h-5 text-[var(--primary)]" /> : <Play className="w-4 h-4 sm:w-5 sm:h-5 text-[var(--primary)]" />}
-                </button>
+                <div className="flex gap-2">
+                  <button
+                    onClick={() => setIsPlaying(!isPlaying)}
+                    className="p-2 sm:p-3 bg-[var(--primary)]/20 hover:bg-[var(--primary)]/30 rounded-lg transition"
+                    aria-label={isPlaying ? 'Pause animation' : 'Play animation'}
+                  >
+                    {isPlaying ? <Pause className="w-4 h-4 sm:w-5 sm:h-5 text-[var(--primary)]" /> : <Play className="w-4 h-4 sm:w-5 sm:h-5 text-[var(--primary)]" />}
+                  </button>
+                  <button
+                    onClick={handleReset}
+                    className="p-2 sm:p-3 bg-[var(--secondary)]/20 hover:bg-[var(--secondary)]/30 rounded-lg transition"
+                    aria-label="Reset simulation"
+                  >
+                    <RotateCcw className="w-4 h-4 sm:w-5 sm:h-5 text-[var(--primary)]" />
+                  </button>
+                </div>
               </div>
 
-              {/* Canvas Container - Responsive */}
-              <div className="relative bg-[var(--background)]/50 rounded-lg overflow-hidden border border-[var(--primary)]/20" style={{ height: '300px', minHeight: '300px' }}>
-                <canvas
-                  ref={canvasRef}
-                  className="w-full h-full"
-                  style={{ width: '100%', height: '100%', display: 'block' }}
+              {/* 3D DNA Editing Simulation Container */}
+              <div className="relative bg-gradient-to-br from-primary/10 to-accent/10 rounded-lg overflow-hidden border border-[var(--primary)]/20" style={{ height: '500px', minHeight: '500px' }}>
+                <RealTimeDNAEditingWrapper 
+                  className="w-full h-full absolute inset-0"
+                  isPlaying={isPlaying}
+                  onProgressChange={setProgress}
                 />
+                
+                {/* Overlay Instructions */}
+                {!isPlaying && progress === 0 && (
+                  <div className="absolute inset-0 flex items-center justify-center bg-[var(--background)]/50 backdrop-blur-sm z-10">
+                    <div className="text-center p-6 bg-[var(--background)]/90 rounded-xl border-2 border-[var(--primary)]/20">
+                      <p className="text-lg font-semibold text-[var(--text)] mb-2">Ready to Start?</p>
+                      <p className="text-sm text-[var(--text)]/70 mb-4">Click Play to begin the DNA editing simulation</p>
+                      <button
+                        onClick={() => setIsPlaying(true)}
+                        className="px-4 py-2 bg-[var(--primary)] rounded-lg font-semibold hover:opacity-90 transition text-sm text-[var(--background)]"
+                      >
+                        <Play className="w-4 h-4 inline mr-2" />
+                        Start Simulation
+                      </button>
+                    </div>
+                  </div>
+                )}
               </div>
+              
+              {/* Progress Bar */}
+              {progress > 0 && (
+                <div className="mt-4">
+                  <div className="w-full h-2 bg-[var(--secondary)]/30 rounded-full overflow-hidden">
+                    <div 
+                      className="h-full bg-gradient-to-r from-[var(--primary)] to-[var(--accent)] transition-all duration-300 rounded-full"
+                      style={{ width: `${progress * 100}%` }}
+                    />
+                  </div>
+                  <p className="text-xs text-[var(--text)]/50 mt-2 text-center">
+                    Edit Progress: {Math.round(progress * 100)}%
+                  </p>
+                </div>
+              )}
 
               {/* Base Pairs Legend */}
               <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 sm:gap-4 mt-4 sm:mt-6">

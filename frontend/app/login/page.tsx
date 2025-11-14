@@ -1,7 +1,7 @@
 'use client';
 
 import { useState } from 'react';
-import { useRouter } from 'next/navigation';
+import { useRouter, useSearchParams } from 'next/navigation';
 import Link from 'next/link';
 import { LogIn, Mail, Lock, Eye, EyeOff, AlertCircle, Sparkles } from 'lucide-react';
 import { Button } from '@/components/ui/Button';
@@ -10,6 +10,7 @@ import { login, setAuthToken, type ApiError } from '@/lib/api';
 
 export default function LoginPage() {
   const router = useRouter();
+  const searchParams = useSearchParams();
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [showPassword, setShowPassword] = useState(false);
@@ -24,7 +25,14 @@ export default function LoginPage() {
     try {
       const response = await login({ email, password });
       setAuthToken(response.access_token);
-      router.push('/home');
+      
+      // Redirect to returnUrl if provided, otherwise go to home
+      const returnUrl = searchParams.get('returnUrl');
+      if (returnUrl) {
+        router.push(decodeURIComponent(returnUrl));
+      } else {
+        router.push('/home');
+      }
     } catch (err) {
       const apiError = err as ApiError;
       if (apiError.status === 401) {

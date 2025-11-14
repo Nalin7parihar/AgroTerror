@@ -6,7 +6,7 @@ import { ArrowLeft, Send, Bot, User, Sparkles, Languages, BookOpen, AlertCircle 
 import { Button } from '@/components/ui/Button';
 import { Card } from '@/components/ui/Card';
 import { OnboardingHeader } from '@/components/home/OnboardingHeader';
-import { queryLLM, type LLMQueryRequest, type ApiError } from '@/lib/api';
+import { queryLLM, type LLMQueryRequest, type ApiError, removeAuthToken } from '@/lib/api';
 
 type DifficultyLevel = 'basic' | 'intermediate' | 'advanced';
 type Language = 'en' | 'hi' | 'kn';
@@ -158,13 +158,18 @@ export default function ChatbotPage() {
       setMessages((prev) => [...prev, assistantMessage]);
     } catch (err) {
       const apiError = err as ApiError;
-      let errorMessage = 'Failed to get response from AI Tutor. ';
       
       if (apiError.status === 401) {
-        errorMessage += 'Please log in to use the chatbot.';
-        // Optionally redirect to login
-        // router.push('/login');
-      } else if (apiError.status === 400) {
+        // Remove invalid/expired token
+        removeAuthToken();
+        // Redirect to login with return URL
+        const returnUrl = encodeURIComponent(window.location.pathname + window.location.search);
+        router.push(`/login?returnUrl=${returnUrl}`);
+        return;
+      }
+      
+      let errorMessage = 'Failed to get response from AI Tutor. ';
+      if (apiError.status === 400) {
         errorMessage += apiError.detail || 'Invalid request.';
       } else if (apiError.status === 500) {
         errorMessage += 'Server error. Please try again later.';

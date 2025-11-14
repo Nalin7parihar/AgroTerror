@@ -54,55 +54,197 @@ const DNAModel = dynamic(
 function Scene() {
   return (
     <Suspense fallback={null}>
-      {/* Professional RGB lighting setup optimized for screen display */}
+      {/* Comprehensive lighting from all directions */}
       
-      {/* Blue key light - main illumination from top-right */}
+      {/* Top lights - cardinal and diagonal */}
       <directionalLight 
-        position={[4, 6, 4]} 
-        intensity={0.9} 
-        color="#3b82f6"
+        position={[0, 6, 0]} 
+        intensity={0.8} 
+        color="#ffffff"
         castShadow
       />
-      
-      {/* Red fill light - soft from left */}
       <directionalLight 
-        position={[-4, 3, 2]} 
-        intensity={0.6} 
+        position={[4, 6, 4]} 
+        intensity={0.7} 
+        color="#3b82f6"
+      />
+      <directionalLight 
+        position={[-4, 6, 4]} 
+        intensity={0.7} 
         color="#ef4444"
       />
-      
-      {/* Green accent - balanced from right */}
-      <pointLight 
-        position={[3, 2, 3]} 
+      <directionalLight 
+        position={[4, 6, -4]} 
         intensity={0.7} 
         color="#10b981"
       />
-      
-      {/* Blue rim light - depth from behind */}
-      <pointLight 
-        position={[-2, 1, -4]} 
-        intensity={0.8} 
-        color="#3b82f6"
+      <directionalLight 
+        position={[-4, 6, -4]} 
+        intensity={0.7} 
+        color="#f59e0b"
       />
       
-      {/* Red bottom accent - subtle glow */}
+      {/* Bottom lights - cardinal and diagonal */}
+      <directionalLight 
+        position={[0, -6, 0]} 
+        intensity={0.6} 
+        color="#ffffff"
+      />
       <pointLight 
-        position={[0, -3, 1]} 
+        position={[3, -4, 3]} 
+        intensity={0.5} 
+        color="#3b82f6"
+      />
+      <pointLight 
+        position={[-3, -4, 3]} 
+        intensity={0.5} 
+        color="#ef4444"
+      />
+      <pointLight 
+        position={[3, -4, -3]} 
+        intensity={0.5} 
+        color="#10b981"
+      />
+      <pointLight 
+        position={[-3, -4, -3]} 
+        intensity={0.5} 
+        color="#f59e0b"
+      />
+      
+      {/* Front lights - left, center, right */}
+      <directionalLight 
+        position={[0, 0, 6]} 
+        intensity={0.7} 
+        color="#ffffff"
+      />
+      <pointLight 
+        position={[3, 2, 5]} 
+        intensity={0.6} 
+        color="#3b82f6"
+      />
+      <pointLight 
+        position={[-3, 2, 5]} 
+        intensity={0.6} 
+        color="#ef4444"
+      />
+      <pointLight 
+        position={[0, -2, 5]} 
+        intensity={0.5} 
+        color="#10b981"
+      />
+      
+      {/* Back lights - left, center, right */}
+      <directionalLight 
+        position={[0, 0, -6]} 
+        intensity={0.7} 
+        color="#ffffff"
+      />
+      <pointLight 
+        position={[3, 2, -5]} 
+        intensity={0.6} 
+        color="#3b82f6"
+      />
+      <pointLight 
+        position={[-3, 2, -5]} 
+        intensity={0.6} 
+        color="#ef4444"
+      />
+      <pointLight 
+        position={[0, -2, -5]} 
+        intensity={0.5} 
+        color="#10b981"
+      />
+      
+      {/* Left side lights - top, middle, bottom */}
+      <directionalLight 
+        position={[-6, 0, 0]} 
+        intensity={0.7} 
+        color="#ffffff"
+      />
+      <pointLight 
+        position={[-5, 3, 2]} 
+        intensity={0.6} 
+        color="#ef4444"
+      />
+      <pointLight 
+        position={[-5, 0, 0]} 
+        intensity={0.5} 
+        color="#f59e0b"
+      />
+      <pointLight 
+        position={[-5, -3, 2]} 
         intensity={0.5} 
         color="#ef4444"
       />
       
-      {/* Green back light - additional depth */}
+      {/* Right side lights - top, middle, bottom */}
+      <directionalLight 
+        position={[6, 0, 0]} 
+        intensity={0.7} 
+        color="#ffffff"
+      />
       <pointLight 
-        position={[1, -1, -2]} 
+        position={[5, 3, 2]} 
+        intensity={0.6} 
+        color="#3b82f6"
+      />
+      <pointLight 
+        position={[5, 0, 0]} 
+        intensity={0.5} 
+        color="#10b981"
+      />
+      <pointLight 
+        position={[5, -3, 2]} 
+        intensity={0.5} 
+        color="#3b82f6"
+      />
+      
+      {/* Diagonal corner lights for complete coverage */}
+      <pointLight 
+        position={[4, 4, 4]} 
+        intensity={0.4} 
+        color="#3b82f6"
+      />
+      <pointLight 
+        position={[-4, 4, 4]} 
+        intensity={0.4} 
+        color="#ef4444"
+      />
+      <pointLight 
+        position={[4, 4, -4]} 
         intensity={0.4} 
         color="#10b981"
       />
+      <pointLight 
+        position={[-4, 4, -4]} 
+        intensity={0.4} 
+        color="#f59e0b"
+      />
+      <pointLight 
+        position={[4, -4, 4]} 
+        intensity={0.4} 
+        color="#3b82f6"
+      />
+      <pointLight 
+        position={[-4, -4, 4]} 
+        intensity={0.4} 
+        color="#ef4444"
+      />
+      <pointLight 
+        position={[4, -4, -4]} 
+        intensity={0.4} 
+        color="#10b981"
+      />
+      <pointLight 
+        position={[-4, -4, -4]} 
+        intensity={0.4} 
+        color="#f59e0b"
+      />
       
-      {/* Balanced ambient light for color blending */}
-      <ambientLight intensity={0.25} color="#ffffff" />
+      {/* Balanced ambient light for color blending and fill */}
+      <ambientLight intensity={0.3} color="#ffffff" />
       
-      <DNAModel scale={[0.8, 0.8, 0.8]} position={[0, -0.2, 0]} />
+      <DNAModel scale={[0.3, 0.3, 0.3]} position={[-0.9, -0.2, 0]} />
       <OrbitControls
         enableZoom={false}
         enablePan={false}

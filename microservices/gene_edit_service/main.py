@@ -5,8 +5,9 @@ import os
 import sys
 import logging
 import uuid
+import time
 from pathlib import Path
-from typing import List, Optional
+from typing import List, Optional, Dict
 from contextlib import asynccontextmanager
 
 from fastapi import FastAPI, HTTPException, BackgroundTasks
@@ -40,6 +41,7 @@ logger = logging.getLogger(__name__)
 
 # Global service instances
 bim_parser: Optional[BIMParser] = None
+dataset_parsers: Dict[str, BIMParser] = {}  # Store all loaded dataset parsers
 graph_crispr_service: Optional[GraphCRISPRService] = None
 dnabert_service: Optional[DNABERTService] = None
 redis_cache: Optional[RedisCache] = None
@@ -53,25 +55,40 @@ async def lifespan(app: FastAPI):
     # Startup
     logger.info("Starting Gene Edit Microservice...")
     
-    global bim_parser, graph_crispr_service, dnabert_service, redis_cache, dataset_manager, current_dataset_name
+    global bim_parser, dataset_parsers, graph_crispr_service, dnabert_service, redis_cache, dataset_manager, current_dataset_name
     
-    # Initialize Redis cache
+    # Initialize Redis cache with retry logic
+    redis_cache = None
     if config.REDIS_ENABLED:
-        try:
-            redis_cache = RedisCache(
-                host=config.REDIS_HOST,
-                port=config.REDIS_PORT,
-                db=config.REDIS_DB,
-                password=config.REDIS_PASSWORD
-            )
-            if redis_cache.is_connected():
-                logger.info("Redis cache connected successfully")
-            else:
-                logger.warning("Redis cache not available, continuing without cache")
-                redis_cache = None
-        except Exception as e:
-            logger.warning(f"Redis initialization failed: {e}. Continuing without cache.")
-            redis_cache = None
+        max_retries = 5
+        retry_delay = 2  # seconds
+        
+        for attempt in range(max_retries):
+            try:
+                logger.info(f"Attempting to connect to Redis at {config.REDIS_HOST}:{config.REDIS_PORT} (attempt {attempt + 1}/{max_retries})...")
+                redis_cache = RedisCache(
+                    host=config.REDIS_HOST,
+                    port=config.REDIS_PORT,
+                    db=config.REDIS_DB,
+                    password=config.REDIS_PASSWORD
+                )
+                if redis_cache.is_connected():
+                    logger.info("Redis cache connected successfully")
+                    break
+                else:
+                    if attempt < max_retries - 1:
+                        logger.warning(f"Redis not available, retrying in {retry_delay} seconds...")
+                        time.sleep(retry_delay)
+                    else:
+                        logger.warning("Redis cache not available after all retries, continuing without cache")
+                        redis_cache = None
+            except Exception as e:
+                if attempt < max_retries - 1:
+                    logger.warning(f"Redis connection failed: {e}. Retrying in {retry_delay} seconds...")
+                    time.sleep(retry_delay)
+                else:
+                    logger.warning(f"Redis initialization failed after {max_retries} attempts: {e}. Continuing without cache.")
+                    redis_cache = None
     else:
         logger.info("Redis cache disabled")
     
@@ -83,65 +100,81 @@ async def lifespan(app: FastAPI):
         logger.error(f"Error initializing dataset manager: {e}")
         dataset_manager = None
     
-    # Pre-cache all datasets into Redis
-    if dataset_manager and redis_cache and redis_cache.is_connected():
-        logger.info("Pre-caching all dataset indices into Redis...")
+    # Load all datasets and build their indices
+    if dataset_manager:
+        logger.info("Loading all available datasets...")
+        loaded_count = 0
         cached_count = 0
+        failed_count = 0
+        
         for dataset_info in dataset_manager.list_all_datasets():
             try:
-                # Check if already cached
-                if redis_cache.cache_index_exists(dataset_info.name):
-                    logger.info(f"  ✓ {dataset_info.display_name} ({dataset_info.name}) - already cached")
-                    cached_count += 1
-                    continue
+                logger.info(f"Loading {dataset_info.display_name} ({dataset_info.name})...")
                 
-                # Load and cache the dataset
-                logger.info(f"  Caching {dataset_info.display_name} ({dataset_info.name})...")
+                # Check if already cached in Redis
+                already_cached = False
+                if redis_cache and redis_cache.is_connected():
+                    already_cached = redis_cache.cache_index_exists(dataset_info.name)
+                    if already_cached:
+                        logger.info(f"  Found existing cache for {dataset_info.display_name} in Redis")
+                
+                # Create parser for this dataset
                 parser = BIMParser(
                     str(dataset_info.file_path),
                     dataset_name=dataset_info.name,
                     redis_cache=redis_cache,
-                    use_cache=True
+                    use_cache=config.REDIS_ENABLED and redis_cache is not None
                 )
-                parser.load_bim_file()  # This will build and cache the index
-                logger.info(f"  ✓ Cached {dataset_info.display_name}: {parser.get_total_snp_count():,} SNPs")
-                cached_count += 1
+                
+                # Load the BIM file and build index
+                # If cached, it will try to load from cache first
+                parser.load_bim_file()
+                
+                # Store parser in dictionary
+                dataset_parsers[dataset_info.name] = parser
+                
+                logger.info(f"  ✓ Loaded {dataset_info.display_name}: {parser.get_total_snp_count():,} SNPs")
+                loaded_count += 1
+                
+                # Cache to Redis if available and not already cached
+                if redis_cache and redis_cache.is_connected():
+                    try:
+                        if not already_cached:
+                            logger.info(f"  Caching {dataset_info.display_name} index to Redis...")
+                            # Cache the index (this will cache the SNP index dictionary)
+                            parser._cache_index()
+                            cached_count += 1
+                            logger.info(f"  ✓ Cached {dataset_info.display_name} to Redis")
+                        else:
+                            cached_count += 1
+                            logger.info(f"  ✓ {dataset_info.display_name} already cached in Redis")
+                    except Exception as e:
+                        logger.warning(f"  ✗ Failed to cache {dataset_info.name} to Redis: {e}")
+                elif redis_cache is None or not redis_cache.is_connected():
+                    logger.warning(f"  Redis not available - {dataset_info.display_name} not cached")
+                
             except Exception as e:
-                logger.warning(f"  ✗ Failed to cache {dataset_info.name}: {e}")
+                logger.error(f"  ✗ Failed to load {dataset_info.name}: {e}")
+                failed_count += 1
         
-        logger.info(f"Pre-caching complete: {cached_count}/{len(dataset_manager.list_all_datasets())} datasets cached")
-    elif dataset_manager and (not redis_cache or not redis_cache.is_connected()):
-        logger.warning("Redis not available - skipping pre-caching. Datasets will be cached on first use.")
-    
-    # Initialize default BIM parser
-    try:
+        logger.info(f"Dataset loading complete: {loaded_count} loaded, {cached_count} cached in Redis, {failed_count} failed")
+        
+        # Set default dataset as current parser
         default_dataset = config.DEFAULT_DATASET
-        dataset_info = None
-        
-        if dataset_manager:
-            dataset_info = dataset_manager.get_dataset(default_dataset)
-        
-        if dataset_info and dataset_info.file_path.exists():
-            bim_file_path = dataset_info.file_path
-            current_dataset_name = dataset_info.name
-        else:
-            # Fallback to config path
-            bim_file_path = Path(config.BIM_FILE_PATH_ENV)
+        if default_dataset in dataset_parsers:
+            bim_parser = dataset_parsers[default_dataset]
             current_dataset_name = default_dataset
-        
-        if bim_file_path.exists():
-            bim_parser = BIMParser(
-                str(bim_file_path),
-                dataset_name=current_dataset_name,
-                redis_cache=redis_cache,
-                use_cache=config.REDIS_ENABLED and redis_cache is not None
-            )
-            bim_parser.load_bim_file()
-            logger.info(f"Loaded {bim_parser.get_total_snp_count()} SNPs from {current_dataset_name} dataset")
+            logger.info(f"Default dataset set to: {current_dataset_name}")
+        elif dataset_parsers:
+            # If default not found, use first available
+            first_dataset = list(dataset_parsers.keys())[0]
+            bim_parser = dataset_parsers[first_dataset]
+            current_dataset_name = first_dataset
+            logger.warning(f"Default dataset '{default_dataset}' not found. Using '{first_dataset}' instead.")
         else:
-            logger.warning(f"BIM file not found at {bim_file_path}")
-    except Exception as e:
-        logger.error(f"Error loading BIM file: {e}")
+            logger.error("No datasets were successfully loaded!")
+    else:
+        logger.warning("Dataset manager not available - cannot load datasets")
     
     # Initialize Graph-CRISPR service
     try:
@@ -280,7 +313,7 @@ def _get_or_load_dataset(dataset_name: Optional[str] = None, category: Optional[
     Returns:
         BIMParser instance or None
     """
-    global bim_parser, current_dataset_name, dataset_manager, redis_cache
+    global bim_parser, dataset_parsers, current_dataset_name, dataset_manager
     
     # Auto-detect dataset if not explicitly provided
     detected_name = _detect_dataset_from_request(
@@ -304,20 +337,43 @@ def _get_or_load_dataset(dataset_name: Optional[str] = None, category: Optional[
     if not target_dataset_name or target_dataset_name == current_dataset_name:
         return bim_parser
     
-    # Load the requested dataset (should be fast since it's pre-cached)
+    # Check if dataset is already loaded in dataset_parsers
+    if target_dataset_name in dataset_parsers:
+        # Switch to the pre-loaded dataset
+        bim_parser = dataset_parsers[target_dataset_name]
+        current_dataset_name = target_dataset_name
+        if dataset_info:
+            logger.info(f"Switched to dataset: {target_dataset_name} ({dataset_info.display_name})")
+        return bim_parser
+    
+    # If dataset not pre-loaded, try to load it on-demand (fallback)
     if dataset_info and dataset_info.file_path.exists():
         try:
+            logger.warning(f"Dataset {target_dataset_name} not pre-loaded, loading on-demand...")
             new_parser = BIMParser(
                 str(dataset_info.file_path),
                 dataset_name=target_dataset_name,
                 redis_cache=redis_cache,
                 use_cache=config.REDIS_ENABLED and redis_cache is not None
             )
-            new_parser.load_bim_file()  # Will load from cache if pre-cached
+            new_parser.load_bim_file()
+            
+            # Cache to Redis if available
+            if redis_cache and redis_cache.is_connected():
+                try:
+                    if not redis_cache.cache_index_exists(target_dataset_name):
+                        logger.info(f"Caching {target_dataset_name} to Redis...")
+                        new_parser._cache_index()
+                        logger.info(f"Cached {target_dataset_name} to Redis")
+                except Exception as e:
+                    logger.warning(f"Failed to cache {target_dataset_name} to Redis: {e}")
+            
+            # Store in dictionary for future use
+            dataset_parsers[target_dataset_name] = new_parser
             # Update global parser and dataset name
             bim_parser = new_parser
             current_dataset_name = target_dataset_name
-            logger.info(f"Switched to dataset: {target_dataset_name} ({dataset_info.display_name})")
+            logger.info(f"Loaded and switched to dataset: {target_dataset_name} ({dataset_info.display_name})")
             return new_parser
         except Exception as e:
             logger.error(f"Error loading dataset {target_dataset_name}: {e}")
@@ -396,7 +452,7 @@ async def suggest_gene_edits(request: GeneEditRequest):
         validations_raw = dnabert_service.validate_edits(
             original_sequence=request.dna_sequence,
             edit_suggestions=edit_suggestions_raw,
-            threshold=0.1
+            threshold=0.0
         )
         
         dnabert_validations = [
@@ -557,6 +613,83 @@ async def get_cache_stats():
         return {"connected": False, "message": "Redis cache not available"}
     
     return redis_cache.get_cache_stats()
+
+
+@app.post("/api/v1/cache/reload")
+async def reload_cache():
+    """Manually trigger caching of all datasets to Redis"""
+    global redis_cache, dataset_parsers, dataset_manager
+    
+    # Try to reconnect to Redis if not connected
+    if not redis_cache or not redis_cache.is_connected():
+        if config.REDIS_ENABLED:
+            logger.info("Attempting to reconnect to Redis...")
+            try:
+                redis_cache = RedisCache(
+                    host=config.REDIS_HOST,
+                    port=config.REDIS_PORT,
+                    db=config.REDIS_DB,
+                    password=config.REDIS_PASSWORD
+                )
+                if not redis_cache.is_connected():
+                    raise HTTPException(status_code=503, detail="Redis is not available. Please start Redis server.")
+            except Exception as e:
+                raise HTTPException(status_code=503, detail=f"Failed to connect to Redis: {str(e)}")
+        else:
+            raise HTTPException(status_code=400, detail="Redis caching is disabled in configuration")
+    
+    if not dataset_manager or not dataset_parsers:
+        raise HTTPException(status_code=503, detail="Datasets not loaded")
+    
+    cached_count = 0
+    failed_count = 0
+    results = []
+    
+    for dataset_name, parser in dataset_parsers.items():
+        try:
+            dataset_info = dataset_manager.get_dataset(dataset_name)
+            if not dataset_info:
+                continue
+            
+            # Update parser's redis_cache reference
+            parser.redis_cache = redis_cache
+            parser.use_cache = True
+            
+            # Check if already cached
+            if redis_cache.cache_index_exists(dataset_name):
+                results.append({
+                    "dataset": dataset_name,
+                    "status": "already_cached",
+                    "message": f"{dataset_info.display_name} already cached"
+                })
+                cached_count += 1
+            else:
+                # Cache the dataset
+                logger.info(f"Caching {dataset_info.display_name} to Redis...")
+                parser._cache_index()
+                results.append({
+                    "dataset": dataset_name,
+                    "status": "cached",
+                    "message": f"{dataset_info.display_name} cached successfully",
+                    "snps": parser.get_total_snp_count()
+                })
+                cached_count += 1
+        except Exception as e:
+            logger.error(f"Failed to cache {dataset_name}: {e}")
+            results.append({
+                "dataset": dataset_name,
+                "status": "failed",
+                "message": str(e)
+            })
+            failed_count += 1
+    
+    return {
+        "success": True,
+        "total_datasets": len(dataset_parsers),
+        "cached": cached_count,
+        "failed": failed_count,
+        "results": results
+    }
 
 
 @app.get("/api/v1/snps/{chromosome}/{position}")

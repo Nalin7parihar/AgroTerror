@@ -140,18 +140,19 @@ function DNAEditingScene({ isPlaying, progress }: { isPlaying: boolean; progress
   const editProgress = isPlaying ? Math.min(progress, 1) : 0;
   const isEditing = editProgress > 0;
 
+  // Base pair colors from analysis page
+  const basePairColors = ['#00ff88', '#ff0088', '#00d4ff', '#ffaa00']; // adenine, thymine, cytosine, guanine
+  
   const getPrimaryColor = () => {
-    if (typeof window === 'undefined') return '#00bf63';
-    return getComputedStyle(document.documentElement)
-      .getPropertyValue('--primary')
-      .trim() || '#00bf63';
+    return basePairColors[2]; // cytosine - cyan/blue for strand 1
   };
 
   const getSecondaryColor = () => {
-    if (typeof window === 'undefined') return '#42ffa4';
-    return getComputedStyle(document.documentElement)
-      .getPropertyValue('--secondary')
-      .trim() || '#42ffa4';
+    return basePairColors[3]; // guanine - orange/yellow for strand 2
+  };
+  
+  const getBasePairColor = (index: number) => {
+    return basePairColors[index % 4];
   };
 
   return (
@@ -169,20 +170,21 @@ function DNAEditingScene({ isPlaying, progress }: { isPlaying: boolean; progress
         editProgress={editProgress}
       />
       
-      {/* Base pairs */}
+      {/* Base pairs with alternating colors */}
       {points.map((point1, index) => {
         if (index >= points2.length) return null;
         const point2 = points2[index];
         const midPoint = new THREE.Vector3().addVectors(point1, point2).multiplyScalar(0.5);
         const distance = point1.distanceTo(point2);
+        const baseColor = getBasePairColor(index);
         
         return (
           <mesh key={`basepair-${index}`} position={midPoint}>
             <cylinderGeometry args={[0.025, 0.025, distance, 12]} />
             <meshStandardMaterial 
-              color={getPrimaryColor()}
-              emissive={getPrimaryColor()}
-              emissiveIntensity={0.3}
+              color={baseColor}
+              emissive={baseColor}
+              emissiveIntensity={0.5}
               metalness={0.3}
               roughness={0.4}
             />

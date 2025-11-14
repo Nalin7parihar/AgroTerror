@@ -1,0 +1,36 @@
+{
+  "demo_1_basic": {
+    "dna_sequence": "ATCGATCGATCGATCGATCGATCGATCGATCGATCGATCGATCGATCGATCGATCGATCGATCG",
+    "target_trait": "plant_height",
+    "max_suggestions": 5,
+    "min_efficiency": 50.0
+  },
+  "demo_2_rice": {
+    "dna_sequence": "GCTAGCTAGCTAGCTAGCTAGCTAGCTAGCTAGCTAGCTAGCTAGCTAGCTAGCTAGCTAGCTA",
+    "target_trait": "yield",
+    "dataset_name": "rice",
+    "max_suggestions": 3,
+    "min_efficiency": 60.0
+  },
+  "demo_3_maize": {
+    "dna_sequence": "TTAACCGGAATTCCGGTTAACCGGAATTCCGGTTAACCGGAATTCCGGTTAACCGGAATTCCGG",
+    "target_trait": "drought_tolerance",
+    "dataset_name": "maize",
+    "target_region": "1:1000-2000",
+    "max_suggestions": 5
+  },
+  "demo_4_chickpea": {
+    "dna_sequence": "ACGTACGTACGTACGTACGTACGTACGTACGTACGTACGTACGTACGTACGTACGTACGTACGT",
+    "target_trait": "disease_resistance",
+    "dataset_name": "chikpea",
+    "max_suggestions": 4,
+    "min_efficiency": 55.0
+  },
+  "demo_5_cotton": {
+    "dna_sequence": "GGCCTTAAGGCCGGCCTTAAGGCCGGCCTTAAGGCCGGCCTTAAGGCCGGCCTTAAGGCCGG",
+    "target_trait": "flowering_time",
+    "dataset_name": "cotton",
+    "max_suggestions": 5
+  }
+}
+
