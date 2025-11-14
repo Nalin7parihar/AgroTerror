@@ -17,6 +17,7 @@ const DNALab3D = () => {
   const [isPlaying, setIsPlaying] = useState(false);
   const [progress, setProgress] = useState(0);
   const [isAuthenticated, setIsAuthenticated] = useState(false);
+  const [activeTab, setActiveTab] = useState(0);
   
   // Analysis form state
   const [dnaSequence, setDnaSequence] = useState('');
@@ -85,8 +86,9 @@ const DNALab3D = () => {
 
       const result = await analyzeGeneEdits(request);
       setAnalysisResult(result);
-      setProgress(1); // Set progress to 100% when analysis completes
-      setIsPlaying(true);
+      setActiveTab(0); // Reset to overview tab
+      setProgress(0); // Reset progress
+      setIsPlaying(false);
       
       // Refresh history after analysis
       if (showHistory) {
@@ -568,12 +570,67 @@ const DNALab3D = () => {
                 </div>
               </div>
 
+              {/* Tabs for Edit Suggestions */}
+              {analysisResult && analysisResult.edit_suggestions.length > 0 && (
+                <div className="mb-4 border-b border-[var(--primary)]/30">
+                  <div className="flex flex-wrap gap-2 overflow-x-auto">
+                    <button
+                      onClick={() => setActiveTab(0)}
+                      className={`
+                        flex items-center gap-2 px-3 py-2 border-b-2 transition-colors text-sm
+                        ${activeTab === 0 
+                          ? 'border-[var(--primary)] text-[var(--primary)] font-semibold' 
+                          : 'border-transparent text-[var(--text)]/60 hover:text-[var(--text)] hover:border-[var(--primary)]/40'
+                        }
+                      `}
+                    >
+                      <Dna className="w-4 h-4" />
+                      <span>Overview</span>
+                    </button>
+                    {analysisResult.edit_suggestions.slice(0, 5).map((edit, idx) => {
+                      const tabId = idx + 1;
+                      const isActive = activeTab === tabId;
+                      return (
+                        <button
+                          key={tabId}
+                          onClick={() => setActiveTab(tabId)}
+                          className={`
+                            flex items-center gap-2 px-3 py-2 border-b-2 transition-colors text-sm
+                            ${isActive 
+                              ? 'border-[var(--primary)] text-[var(--primary)] font-semibold' 
+                              : 'border-transparent text-[var(--text)]/60 hover:text-[var(--text)] hover:border-[var(--primary)]/40'
+                            }
+                          `}
+                        >
+                          <Activity className="w-4 h-4" />
+                          <span>Edit {tabId}</span>
+                        </button>
+                      );
+                    })}
+                  </div>
+                </div>
+              )}
+
               {/* 3D DNA Editing Simulation Container */}
               <div className="relative bg-gradient-to-br from-primary/10 to-accent/10 rounded-lg overflow-hidden border border-[var(--primary)]/20" style={{ height: '500px', minHeight: '500px' }}>
                 <RealTimeDNAEditingWrapper 
                   className="w-full h-full absolute inset-0"
                   isPlaying={isPlaying && analysisResult !== null}
                   onProgressChange={setProgress}
+                  dnaSequence={(() => {
+                    if (!analysisResult || !dnaSequence) return '';
+                    if (activeTab === 0) return dnaSequence;
+                    const edit = analysisResult.edit_suggestions[activeTab - 1];
+                    if (!edit) return dnaSequence;
+                    const seq = dnaSequence.split('');
+                    if (seq[edit.target_position]) {
+                      seq[edit.target_position] = edit.target_base;
+                    }
+                    return seq.join('');
+                  })()}
+                  editPosition={analysisResult && activeTab > 0 ? analysisResult.edit_suggestions[activeTab - 1]?.target_position : undefined}
+                  originalBase={analysisResult && activeTab > 0 ? analysisResult.edit_suggestions[activeTab - 1]?.original_base : undefined}
+                  targetBase={analysisResult && activeTab > 0 ? analysisResult.edit_suggestions[activeTab - 1]?.target_base : undefined}
                 />
                 
                 {/* Overlay Instructions */}
@@ -582,6 +639,31 @@ const DNALab3D = () => {
                     <div className="text-center p-6 bg-[var(--background)]/90 rounded-xl border-2 border-[var(--primary)]/20">
                       <p className="text-lg font-semibold text-[var(--text)] mb-2">Ready to Start?</p>
                       <p className="text-sm text-[var(--text)]/70 mb-4">Fill out the form above and click "Start Analysis" to begin</p>
+                    </div>
+                  </div>
+                )}
+
+                {/* Tab-specific info overlay */}
+                {analysisResult && activeTab > 0 && analysisResult.edit_suggestions[activeTab - 1] && (
+                  <div className="absolute top-4 left-4 right-4 z-10">
+                    <div className="bg-[var(--background)]/90 backdrop-blur-sm rounded-lg p-4 border border-[var(--primary)]/20">
+                      <div className="flex items-start justify-between gap-4">
+                        <div className="flex-1">
+                          <h3 className="font-semibold text-[var(--text)] mb-2">Edit {activeTab}</h3>
+                          <div className="space-y-1 text-sm text-[var(--text)]/70">
+                            <p>Position: <span className="font-mono font-semibold text-[var(--primary)]">{analysisResult.edit_suggestions[activeTab - 1].target_position}</span></p>
+                            <p>Edit: <span className="font-mono">{analysisResult.edit_suggestions[activeTab - 1].original_base}</span> → <span className="font-mono text-[var(--primary)] font-bold">{analysisResult.edit_suggestions[activeTab - 1].target_base}</span></p>
+                            <p>Efficiency: <span className="font-semibold text-[var(--primary)]">{analysisResult.edit_suggestions[activeTab - 1].efficiency_score.toFixed(1)}%</span></p>
+                            {analysisResult.dnabert_validations?.[activeTab - 1] && (
+                              <p>Validation: {analysisResult.dnabert_validations[activeTab - 1].validation_passed ? (
+                                <span className="text-green-500 font-semibold">✓ Passed</span>
+                              ) : (
+                                <span className="text-red-500 font-semibold">✗ Failed</span>
+                              )}</p>
+                            )}
+                          </div>
+                        </div>
+                      </div>
                     </div>
                   </div>
                 )}

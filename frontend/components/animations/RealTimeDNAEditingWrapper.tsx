@@ -33,11 +33,19 @@ const RealTimeDNAEditing = dynamic(
 export function RealTimeDNAEditingWrapper({ 
   className = '',
   isPlaying = false,
-  onProgressChange
+  onProgressChange,
+  dnaSequence = '',
+  editPosition,
+  originalBase,
+  targetBase
 }: { 
   className?: string;
   isPlaying?: boolean;
   onProgressChange?: (progress: number) => void;
+  dnaSequence?: string;
+  editPosition?: number;
+  originalBase?: string;
+  targetBase?: string;
 }) {
   const [hasError, setHasError] = useState(false);
   const [isClient, setIsClient] = useState(false);
@@ -56,6 +64,10 @@ export function RealTimeDNAEditingWrapper({
         className={className}
         isPlaying={isPlaying}
         onProgressChange={onProgressChange}
+        dnaSequence={dnaSequence}
+        editPosition={editPosition}
+        originalBase={originalBase}
+        targetBase={targetBase}
       />
     );
   } catch (error) {

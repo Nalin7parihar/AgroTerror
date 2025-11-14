@@ -8,17 +8,29 @@ import { Canvas, useFrame } from '@react-three/fiber';
 import { OrbitControls, PerspectiveCamera } from '@react-three/drei';
 import * as THREE from 'three';
 
+// Nucleotide color mapping
+const NUCLEOTIDE_COLORS: Record<string, string> = {
+  'A': '#ff00ff', // Magenta
+  'T': '#ff0088', // Pink/Red
+  'G': '#ffaa00', // Orange
+  'C': '#00d4ff', // Cyan
+};
+
 // Simple DNA Strand using basic primitives
 function DNAStrandModel({ 
   points, 
   color, 
   isEditing = false, 
-  editProgress = 0 
+  editProgress = 0,
+  nucleotideColors = [],
+  editPosition = undefined
 }: { 
   points: THREE.Vector3[];
   color: string;
   isEditing?: boolean;
   editProgress?: number;
+  nucleotideColors?: string[];
+  editPosition?: number;
 }) {
   const groupRef = useRef<THREE.Group>(null);
 
@@ -28,22 +40,32 @@ function DNAStrandModel({
     }
   });
 
-  // Apply editing effect to points
+  // Apply editing effect to points - only when there's an actual edit position
   const editedPoints = useMemo(() => {
-    if (!isEditing || editProgress === 0) return points;
+    // Only apply editing effect if there's an edit position and we're actually editing
+    if (!isEditing || editProgress === 0 || editPosition === undefined) return points;
+    
+    // Find the index range around the edit position (smaller, more localized effect)
+    const editIndex = Math.floor((editPosition / (points.length - 1)) * points.length);
+    const effectRange = Math.max(3, Math.floor(points.length * 0.1)); // 10% of strand or at least 3 points
+    const startIndex = Math.max(0, editIndex - effectRange);
+    const endIndex = Math.min(points.length - 1, editIndex + effectRange);
     
     return points.map((point, index) => {
-      if (index >= points.length * 0.4 && index <= points.length * 0.6) {
-        const editAmount = Math.sin((index / points.length) * Math.PI) * editProgress * 0.3;
+      if (index >= startIndex && index <= endIndex) {
+        // Smooth falloff effect centered on edit position
+        const distanceFromEdit = Math.abs(index - editIndex) / effectRange;
+        const falloff = Math.max(0, 1 - distanceFromEdit);
+        const editAmount = Math.sin(falloff * Math.PI) * editProgress * 0.15; // Reduced from 0.3 to 0.15
         return new THREE.Vector3(
-          point.x + editAmount,
+          point.x + editAmount * 0.5, // Reduced movement
           point.y,
-          point.z + editAmount * 0.5
+          point.z + editAmount * 0.3  // Reduced movement
         );
       }
       return point.clone();
     });
-  }, [points, isEditing, editProgress]);
+  }, [points, isEditing, editProgress, editPosition]);
 
   const accentColor = typeof window !== 'undefined' 
     ? getComputedStyle(document.documentElement).getPropertyValue('--accent').trim() || '#d270ad'
@@ -53,13 +75,20 @@ function DNAStrandModel({
     <group ref={groupRef}>
       {/* Render spheres for each point */}
       {editedPoints.map((point, index) => {
-        const isEdited = isEditing && index >= points.length * 0.4 && index <= points.length * 0.6;
+        // Only highlight as edited if there's an actual edit position
+        const editIndex = editPosition !== undefined ? Math.floor((editPosition / (points.length - 1)) * points.length) : -1;
+        const effectRange = Math.max(3, Math.floor(points.length * 0.1));
+        const isEdited = isEditing && editPosition !== undefined && 
+          index >= Math.max(0, editIndex - effectRange) && 
+          index <= Math.min(points.length - 1, editIndex + effectRange);
+        // Use nucleotide-specific color if available, otherwise use default
+        const baseColor = nucleotideColors[index] || (isEdited ? accentColor : color);
         return (
           <mesh key={index} position={point}>
             <sphereGeometry args={[0.1, 16, 16]} />
             <meshStandardMaterial 
-              color={isEdited ? accentColor : color}
-              emissive={isEdited ? accentColor : color}
+              color={baseColor}
+              emissive={baseColor}
               emissiveIntensity={isEdited ? 0.9 : 0.5}
               metalness={0.6}
               roughness={0.2}
@@ -74,13 +103,15 @@ function DNAStrandModel({
         const direction = new THREE.Vector3().subVectors(nextPoint, point);
         const length = direction.length();
         const midPoint = new THREE.Vector3().addVectors(point, nextPoint).multiplyScalar(0.5);
+        // Use color from first point of the connection
+        const connectionColor = nucleotideColors[index] || color;
         
         return (
           <mesh key={`conn-${index}`} position={midPoint}>
             <cylinderGeometry args={[0.05, 0.05, length, 12]} />
             <meshStandardMaterial 
-              color={color}
-              emissive={color}
+              color={connectionColor}
+              emissive={connectionColor}
               emissiveIntensity={0.4}
               metalness={0.4}
               roughness={0.3}
@@ -116,15 +147,46 @@ function CRISPRProtein({ position, isActive }: { position: [number, number, numb
   );
 }
 
-function DNAEditingScene({ isPlaying, progress }: { isPlaying: boolean; progress: number }) {
-  const { points, points2 } = useMemo(() => {
+function DNAEditingScene({ 
+  isPlaying, 
+  progress, 
+  dnaSequence = '',
+  editPosition,
+  originalBase,
+  targetBase
+}: { 
+  isPlaying: boolean; 
+  progress: number;
+  dnaSequence?: string;
+  editPosition?: number;
+  originalBase?: string;
+  targetBase?: string;
+}) {
+  // Helper function to get complementary base
+  const getComplementaryBase = (base: string): string => {
+    const complement: Record<string, string> = {
+      'A': 'T',
+      'T': 'A',
+      'G': 'C',
+      'C': 'G'
+    };
+    return complement[base.toUpperCase()] || 'T';
+  };
+
+  const { points, points2, nucleotideColors1, nucleotideColors2, basePairColors } = useMemo(() => {
     const p1: THREE.Vector3[] = [];
     const p2: THREE.Vector3[] = [];
+    const colors1: string[] = [];
+    const colors2: string[] = [];
+    const bpColors: string[] = [];
     
-    const numSegments = 20;
+    // Determine number of segments based on sequence length or default
+    const seqLength = dnaSequence.length || 20;
+    const numSegments = Math.max(seqLength, 20);
     const radius = 0.7;
     const height = 2.5;
     
+    // Generate colors from sequence
     for (let i = 0; i <= numSegments; i++) {
       const t = i / numSegments;
       const angle = t * Math.PI * 3;
@@ -132,27 +194,40 @@ function DNAEditingScene({ isPlaying, progress }: { isPlaying: boolean; progress
       
       p1.push(new THREE.Vector3(Math.cos(angle) * radius, y, Math.sin(angle) * radius));
       p2.push(new THREE.Vector3(Math.cos(angle + Math.PI) * radius, y, Math.sin(angle + Math.PI) * radius));
+      
+      // Get nucleotide color from sequence
+      const seqIndex = Math.floor((i / numSegments) * seqLength);
+      const nucleotide1 = dnaSequence[seqIndex]?.toUpperCase() || 'A';
+      const nucleotide2 = getComplementaryBase(nucleotide1);
+      
+      // If this is the edit position and we're editing, use target base color
+      let color1: string;
+      if (editPosition !== undefined && seqIndex === editPosition && progress > 0) {
+        color1 = NUCLEOTIDE_COLORS[targetBase?.toUpperCase() || nucleotide1] || NUCLEOTIDE_COLORS[nucleotide1];
+      } else {
+        color1 = NUCLEOTIDE_COLORS[nucleotide1] || NUCLEOTIDE_COLORS['A'];
+      }
+      const color2 = NUCLEOTIDE_COLORS[nucleotide2] || NUCLEOTIDE_COLORS['T'];
+      
+      colors1.push(color1);
+      colors2.push(color2);
+      // Base pair color is the average or use the first strand color
+      bpColors.push(color1);
     }
     
-    return { points: p1, points2: p2 };
-  }, []);
+    return { points: p1, points2: p2, nucleotideColors1: colors1, nucleotideColors2: colors2, basePairColors: bpColors };
+  }, [dnaSequence, editPosition, targetBase, progress]);
 
   const editProgress = isPlaying ? Math.min(progress, 1) : 0;
   const isEditing = editProgress > 0;
 
-  // Base pair colors from analysis page
-  const basePairColors = ['#00ff88', '#ff0088', '#00d4ff', '#ffaa00']; // adenine, thymine, cytosine, guanine
-  
+  // Default fallback colors
   const getPrimaryColor = () => {
-    return basePairColors[2]; // cytosine - cyan/blue for strand 1
+    return NUCLEOTIDE_COLORS['C'] || '#00d4ff'; // cyan for strand 1
   };
 
   const getSecondaryColor = () => {
-    return basePairColors[3]; // guanine - orange/yellow for strand 2
-  };
-  
-  const getBasePairColor = (index: number) => {
-    return basePairColors[index % 4];
+    return NUCLEOTIDE_COLORS['G'] || '#ffaa00'; // orange for strand 2
   };
 
   return (
@@ -160,23 +235,28 @@ function DNAEditingScene({ isPlaying, progress }: { isPlaying: boolean; progress
       <DNAStrandModel 
         points={points} 
         color={getPrimaryColor()} 
-        isEditing={isEditing}
+        isEditing={isEditing && editPosition !== undefined}
         editProgress={editProgress}
+        nucleotideColors={nucleotideColors1}
+        editPosition={editPosition}
       />
       <DNAStrandModel 
         points={points2} 
         color={getSecondaryColor()} 
-        isEditing={isEditing}
+        isEditing={isEditing && editPosition !== undefined}
         editProgress={editProgress}
+        nucleotideColors={nucleotideColors2}
+        editPosition={editPosition}
       />
       
-      {/* Base pairs with alternating colors */}
+      {/* Base pairs with sequence-based colors */}
       {points.map((point1, index) => {
         if (index >= points2.length) return null;
         const point2 = points2[index];
         const midPoint = new THREE.Vector3().addVectors(point1, point2).multiplyScalar(0.5);
         const distance = point1.distanceTo(point2);
-        const baseColor = getBasePairColor(index);
+        // Use the color from the first strand for the base pair
+        const baseColor = basePairColors[index] || nucleotideColors1[index] || getPrimaryColor();
         
         return (
           <mesh key={`basepair-${index}`} position={midPoint}>
@@ -192,9 +272,13 @@ function DNAEditingScene({ isPlaying, progress }: { isPlaying: boolean; progress
         );
       })}
       
-      {isEditing && (
+      {isEditing && editPosition !== undefined && dnaSequence && (
         <CRISPRProtein 
-          position={[0, (editProgress - 0.5) * 3, 1.2]} 
+          position={[
+            points[Math.floor((editPosition / dnaSequence.length) * points.length)]?.x || 0,
+            points[Math.floor((editPosition / dnaSequence.length) * points.length)]?.y || (editProgress - 0.5) * 2.5,
+            points[Math.floor((editPosition / dnaSequence.length) * points.length)]?.z || 1.2
+          ]} 
           isActive={isPlaying}
         />
       )}
@@ -205,11 +289,19 @@ function DNAEditingScene({ isPlaying, progress }: { isPlaying: boolean; progress
 export function RealTimeDNAEditing({ 
   className = '',
   isPlaying = false,
-  onProgressChange
+  onProgressChange,
+  dnaSequence = '',
+  editPosition,
+  originalBase,
+  targetBase
 }: { 
   className?: string;
   isPlaying?: boolean;
   onProgressChange?: (progress: number) => void;
+  dnaSequence?: string;
+  editPosition?: number;
+  originalBase?: string;
+  targetBase?: string;
 }) {
   const [progress, setProgress] = useState(0);
   const animationRef = useRef<number | undefined>(undefined);
@@ -323,7 +415,14 @@ export function RealTimeDNAEditing({
         <ambientLight intensity={0.3} color="#ffffff" />
         
         {/* DNA Editing Scene */}
-        <DNAEditingScene isPlaying={isPlaying} progress={progress} />
+        <DNAEditingScene 
+          isPlaying={isPlaying} 
+          progress={progress}
+          dnaSequence={dnaSequence}
+          editPosition={editPosition}
+          originalBase={originalBase}
+          targetBase={targetBase}
+        />
         
         {/* Controls */}
         <OrbitControls
