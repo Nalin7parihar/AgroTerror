@@ -41,15 +41,38 @@ if (typeof window !== 'undefined') {
   }
 }
 
-import { useEffect, useState, Suspense } from 'react';
+import { useEffect, useState, Suspense, useRef } from 'react';
 import dynamic from 'next/dynamic';
-import { Canvas } from '@react-three/fiber';
+import { Canvas, useFrame } from '@react-three/fiber';
 import { OrbitControls, PerspectiveCamera } from '@react-three/drei';
+import * as THREE from 'three';
 
 const DNAModel = dynamic(
   () => import('./DNAModel3D').then(mod => ({ default: mod.DNAModel })),
   { ssr: false }
 );
+
+// Component to handle rotation of the DNA model
+function RotatingDNAModel() {
+  const groupRef = useRef<THREE.Group>(null);
+
+  useFrame((state, delta) => {
+    if (groupRef.current) {
+      // Rotate the model continuously on the Y axis
+      groupRef.current.rotation.y += delta * 0.5; // Rotate at 0.5 radians per second
+    }
+  });
+
+  return (
+    <group 
+      ref={groupRef} 
+      position={[0, 0, 0]} // Centered at origin
+      rotation={[0, Math.PI / 2, 0]} // Rotate 90 degrees on Y axis (π/2 radians)
+    >
+      <DNAModel scale={[0.3, 0.3, 0.3]} position={[0, 0, 0]} />
+    </group>
+  );
+}
 
 function Scene() {
   return (
@@ -244,15 +267,15 @@ function Scene() {
       {/* Balanced ambient light for color blending and fill */}
       <ambientLight intensity={0.3} color="#ffffff" />
       
-      <DNAModel scale={[0.3, 0.3, 0.3]} position={[-0.9, -0.2, 0]} />
+      <RotatingDNAModel />
       <OrbitControls
-        enableZoom={false}
-        enablePan={false}
+        enableZoom={true}
+        enablePan={true}
         autoRotate
-        autoRotateSpeed={0.8}
+        autoRotateSpeed={1.5}
         minPolarAngle={Math.PI / 4}
         maxPolarAngle={Math.PI / 1.8}
-        target={[0, -0.2, 0]}
+        target={[0, 0, 0]} // Camera target centered at origin
       />
     </Suspense>
   );
