@@ -2,9 +2,11 @@ from fastapi import FastAPI, Request, status
 from fastapi.responses import JSONResponse
 from fastapi.middleware.cors import CORSMiddleware
 from contextlib import asynccontextmanager
+from slowapi.errors import RateLimitExceeded
 from core.database import connect_to_mongo, close_mongo_connection
 from core.redis import connect_to_redis, close_redis_connection, get_redis
 from core.config import settings
+from core.rate_limit import limiter
 from routers import auth, llm
 import logging
 
@@ -57,6 +59,22 @@ app.add_middleware(
     allow_methods=["*"],
     allow_headers=["*"],
 )
+
+# Add rate limiting exception handler
+@app.exception_handler(RateLimitExceeded)
+async def rate_limit_handler(request: Request, exc: RateLimitExceeded):
+    """Custom handler for rate limit exceeded errors"""
+    return JSONResponse(
+        status_code=status.HTTP_429_TOO_MANY_REQUESTS,
+        content={
+            "detail": f"Rate limit exceeded: {exc.detail}. Please try again later.",
+            "retry_after": exc.retry_after if hasattr(exc, 'retry_after') else 60
+        },
+        headers={"Retry-After": str(exc.retry_after) if hasattr(exc, 'retry_after') else "60"}
+    )
+
+# Add limiter to app state
+app.state.limiter = limiter
 
 # Include routers
 app.include_router(auth.router)

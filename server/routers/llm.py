@@ -1,8 +1,9 @@
-from fastapi import APIRouter, Depends, HTTPException, status
+from fastapi import APIRouter, Depends, HTTPException, status, Request
 from schemas.llm import LLMQueryRequest, LLMQueryResponse
 from services.gemini import generate_response
 from core.dependencies import get_current_user
 from core.database import get_db
+from core.rate_limit import limiter, get_rate_limit
 from model.user import User
 from motor.motor_asyncio import AsyncIOMotorDatabase
 from bson import ObjectId
@@ -15,7 +16,9 @@ router = APIRouter(prefix="/llm", tags=["LLM"])
 
 
 @router.post("/query", response_model=LLMQueryResponse, status_code=status.HTTP_200_OK)
+@limiter.limit(get_rate_limit("llm_query"))
 async def query_llm(
+    http_request: Request,
     request: LLMQueryRequest,
     current_user: User = Depends(get_current_user),
     db: AsyncIOMotorDatabase = Depends(get_db)

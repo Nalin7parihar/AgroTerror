@@ -1,8 +1,9 @@
-from fastapi import APIRouter, Depends, HTTPException, status
+from fastapi import APIRouter, Depends, HTTPException, status, Request
 from schemas.auth import UserCreate, UserLogin, Token, UserResponse
 from core.dependencies import get_current_user
 from core.database import get_db
 from core.security import get_password_hash, verify_password, create_access_token
+from core.rate_limit import limiter, get_rate_limit
 from model.user import User
 from datetime import timedelta
 from core.config import settings
@@ -13,7 +14,8 @@ router = APIRouter(prefix="/auth", tags=["Authentication"])
 
 
 @router.post("/register", response_model=UserResponse, status_code=status.HTTP_201_CREATED)
-async def register(user_data: UserCreate, db: AsyncIOMotorDatabase = Depends(get_db)):
+@limiter.limit(get_rate_limit("auth_register"))
+async def register(request: Request, user_data: UserCreate, db: AsyncIOMotorDatabase = Depends(get_db)):
     """
     Register a new user
     """
@@ -63,7 +65,8 @@ async def register(user_data: UserCreate, db: AsyncIOMotorDatabase = Depends(get
 
 
 @router.post("/login", response_model=Token)
-async def login(login_data: UserLogin, db: AsyncIOMotorDatabase = Depends(get_db)):
+@limiter.limit(get_rate_limit("auth_login"))
+async def login(request: Request, login_data: UserLogin, db: AsyncIOMotorDatabase = Depends(get_db)):
     """
     Login and get access token
     """
@@ -107,7 +110,8 @@ async def login(login_data: UserLogin, db: AsyncIOMotorDatabase = Depends(get_db
 
 
 @router.get("/me", response_model=UserResponse)
-async def get_current_user_info(current_user: User = Depends(get_current_user)):
+@limiter.limit(get_rate_limit("auth_me"))
+async def get_current_user_info(request: Request, current_user: User = Depends(get_current_user)):
     """
     Get current authenticated user information
     """

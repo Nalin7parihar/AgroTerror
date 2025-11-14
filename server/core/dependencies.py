@@ -1,4 +1,4 @@
-from fastapi import Depends, HTTPException, status
+from fastapi import Depends, HTTPException, status, Request
 from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
 from jose import JWTError, jwt
 from bson import ObjectId
@@ -13,11 +13,13 @@ logger = logging.getLogger(__name__)
 security = HTTPBearer(auto_error=False)
 
 async def get_current_user(
+    request: Request,
     credentials: HTTPAuthorizationCredentials = Depends(security),
     db: AsyncIOMotorDatabase = Depends(get_db)
 ) -> User:
     """
     Dependency to get the current authenticated user from JWT token
+    Also stores user_id in request state for rate limiting
     """
     credentials_exception = HTTPException(
         status_code=status.HTTP_401_UNAUTHORIZED,
@@ -42,9 +44,9 @@ async def get_current_user(
         if user_id is None:
             logger.warning("Authentication failed: No user ID in token payload")
             raise credentials_exception
-    except JWTError as e:
-        logger.warning(f"Authentication failed: JWT validation error - {str(e)}")
-        raise credentials_exception
+        
+        # Store user_id in request state for rate limiting
+        request.state.user_id = user_id
     except Exception as e:
         logger.error(f"Authentication error: {str(e)}")
         raise credentials_exception
