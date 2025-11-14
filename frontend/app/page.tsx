@@ -93,15 +93,10 @@ export default function LandingPage() {
       <section className="relative overflow-hidden pt-12 pb-20 sm:pt-16 sm:pb-24">
         <div className="absolute inset-0 bg-gradient-to-br from-primary/5 via-transparent to-accent/5" />
         <div className="container mx-auto px-4 sm:px-6 lg:px-8 relative z-10">
-          <div className="max-w-6xl mx-auto">
-            <div className="grid lg:grid-cols-2 gap-8 lg:gap-12 items-center mb-12">
-              {/* 3D DNA Model */}
-              <div className="order-2 lg:order-1 h-[300px] sm:h-[400px] lg:h-[500px] w-full">
-                <DNAModel3DWrapper className="w-full h-full rounded-2xl overflow-hidden" />
-              </div>
-              
-              {/* Hero Content */}
-              <div className="order-1 lg:order-2 text-center lg:text-left">
+          <div className="max-w-7xl mx-auto">
+            <div className="grid lg:grid-cols-2 gap-8 lg:gap-16 items-center mb-12">
+              {/* Hero Content - Now on the left */}
+              <div className="order-1 lg:order-1 text-center lg:text-left">
                 <div className="inline-flex items-center gap-2 px-4 py-2 rounded-full bg-primary/10 text-primary text-sm font-semibold mb-6">
                   <Sparkles className="w-4 h-4" />
                   <span>Automated Trait Discovery & Gene Editing Pipeline</span>
@@ -139,6 +134,16 @@ export default function LandingPage() {
                   >
                     Learn More
                   </Button>
+                </div>
+              </div>
+              
+              {/* 3D DNA Model - Seamless Integration - Now on the right */}
+              <div className="order-2 lg:order-2 h-[300px] sm:h-[400px] md:h-[500px] lg:h-[550px] xl:h-[600px] w-full relative group">
+                {/* Professional glow effect behind the model */}
+                <div className="absolute inset-0 bg-gradient-to-br from-primary/20 via-transparent to-accent/20 rounded-3xl blur-3xl opacity-40 group-hover:opacity-60 transition-opacity duration-500" />
+                {/* Main container - professional frame */}
+                <div className="relative w-full h-full overflow-hidden flex items-center justify-center">
+                  <DNAModel3DWrapper className="w-full h-full" />
                 </div>
               </div>
             </div>
