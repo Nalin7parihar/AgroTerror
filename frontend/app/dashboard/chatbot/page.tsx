@@ -7,6 +7,7 @@ import { Button } from '@/components/ui/Button';
 import { Card } from '@/components/ui/Card';
 import { OnboardingHeader } from '@/components/home/OnboardingHeader';
 import { queryLLM, type LLMQueryRequest, type ApiError, removeAuthToken } from '@/lib/api';
+import { markdownToPlainText } from '@/lib/markdown-to-text';
 
 type DifficultyLevel = 'basic' | 'intermediate' | 'advanced';
 type Language = 'en' | 'hi' | 'kn';
@@ -151,7 +152,7 @@ export default function ChatbotPage() {
       const assistantMessage: Message = {
         id: (Date.now() + 1).toString(),
         role: 'assistant',
-        content: response.answer,
+        content: markdownToPlainText(response.answer),
         timestamp: new Date(),
       };
 
