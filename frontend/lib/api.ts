@@ -124,3 +124,94 @@ export function removeAuthToken() {
   }
 }
 
+// Gene Analysis API functions
+export interface GeneAnalysisRequest {
+  dna_sequence: string;
+  target_trait: 'plant_height' | 'leaf_color' | 'flowering_time' | 'yield' | 'disease_resistance' | 'drought_tolerance' | 'custom';
+  target_region?: string;
+  max_suggestions?: number;
+  min_efficiency?: number;
+  dataset_name?: string;
+  dataset_category?: string;
+}
+
+export interface EditSuggestion {
+  guide_rna: string;
+  target_position: number;
+  edit_type: string;
+  efficiency_score: number;
+  confidence: number;
+  original_base?: string;
+  target_base?: string;
+}
+
+export interface DNABERTValidation {
+  original_score: number;
+  mutated_score: number;
+  difference: number;
+  log_odds_ratio: number;
+  validation_passed: boolean;
+  mutation_position: number;
+}
+
+export interface SNPChange {
+  snp_id: string;
+  chromosome: string;
+  position: number;
+  original_allele: string;
+  new_allele: string;
+  effect_size: number;
+  is_causal_candidate: boolean;
+  nearby_genes: string[];
+  dnabert_score?: number;
+}
+
+export interface EditSummary {
+  total_snps_affected: number;
+  high_impact_snps: number;
+  causal_candidate_snps: SNPChange[];
+  trait_prediction_change: number;
+  risk_assessment: string;
+  overall_confidence: number;
+}
+
+export interface GeneAnalysisResponse {
+  analysis_id: string;
+  request_id: string;
+  edit_suggestions: EditSuggestion[];
+  dnabert_validations: DNABERTValidation[];
+  snp_changes: SNPChange[];
+  summary: EditSummary;
+  metrics: Record<string, any>;
+  created_at: string;
+}
+
+export interface AnalysisHistoryItem {
+  analysis_id: string;
+  dna_sequence: string;
+  target_trait: string;
+  dataset_name?: string;
+  created_at: string;
+  summary: EditSummary;
+}
+
+export interface AnalysisHistoryResponse {
+  analyses: AnalysisHistoryItem[];
+  total: number;
+}
+
+export async function analyzeGeneEdits(request: GeneAnalysisRequest): Promise<GeneAnalysisResponse> {
+  return apiRequest<GeneAnalysisResponse>('/gene-analysis/analyze', {
+    method: 'POST',
+    body: JSON.stringify(request),
+  });
+}
+
+export async function getAnalysisHistory(limit: number = 20, skip: number = 0): Promise<AnalysisHistoryResponse> {
+  return apiRequest<AnalysisHistoryResponse>(`/gene-analysis/history?limit=${limit}&skip=${skip}`);
+}
+
+export async function getAnalysisDetail(analysisId: string): Promise<GeneAnalysisResponse> {
+  return apiRequest<GeneAnalysisResponse>(`/gene-analysis/history/${analysisId}`);
+}
+

@@ -1,4 +1,4 @@
-from . import auth, llm
+from . import auth, llm, gene_analysis
 
-__all__ = ["auth", "llm"]
+__all__ = ["auth", "llm", "gene_analysis"]
 

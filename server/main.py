@@ -7,7 +7,7 @@ from core.database import connect_to_mongo, close_mongo_connection
 from core.redis import connect_to_redis, close_redis_connection, get_redis
 from core.config import settings
 from core.rate_limit import limiter
-from routers import auth, llm
+from routers import auth, llm, gene_analysis
 import logging
 
 # Configure logging
@@ -79,6 +79,7 @@ app.state.limiter = limiter
 # Include routers
 app.include_router(auth.router)
 app.include_router(llm.router)
+app.include_router(gene_analysis.router)
 
 @app.get("/")
 async def root():

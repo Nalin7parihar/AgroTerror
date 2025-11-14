@@ -53,6 +53,11 @@ RATE_LIMITS = {
     # LLM endpoints - moderate limits due to cost
     "llm_query": "30/hour",     # 30 queries per hour per user
     
+    # Gene analysis endpoints - moderate limits due to ML processing cost
+    "gene_analysis": "10/hour",      # 10 analyses per hour per user
+    "gene_analysis_history": "100/hour",  # 100 history requests per hour per user
+    "gene_analysis_detail": "100/hour",   # 100 detail requests per hour per user
+    
     # General API limits
     "default": "1000/hour",     # Default limit for other endpoints
 }

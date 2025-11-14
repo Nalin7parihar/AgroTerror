@@ -41,7 +41,7 @@ export function QuickStartGuide() {
       ],
       ctaText: 'Launch Demo',
       onClick: () => {
-        router.push('/home/simulation');
+        router.push('/analysis');
       },
       color: 'accent',
     },

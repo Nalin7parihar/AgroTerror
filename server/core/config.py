@@ -21,6 +21,9 @@ class Settings(BaseSettings):
     REDIS_URL: str = Field(default="redis://localhost:6379/0", description="Redis connection URL")
     REDIS_CACHE_TTL: int = Field(default=86400, description="Cache TTL in seconds (default: 24 hours)")
     
+    # Gene Edit Microservice Configuration
+    GENE_EDIT_SERVICE_URL: str = Field(default="http://localhost:8001", description="Gene edit microservice URL")
+    
     model_config = SettingsConfigDict(
         env_file=".env",
         case_sensitive=True,
