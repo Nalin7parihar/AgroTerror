@@ -2,6 +2,7 @@
 
 import { useState, useEffect } from 'react';
 import { Menu, X } from 'lucide-react';
+import Image from 'next/image';
 import { Button } from '../ui/Button';
 
 export function NavigationHeader() {
@@ -41,9 +42,16 @@ export function NavigationHeader() {
           <div className="flex items-center">
             <button
               onClick={() => window.scrollTo({ top: 0, behavior: 'smooth' })}
-              className="text-2xl font-bold text-primary hover:text-primary/80 transition-colors"
+              className="flex items-center hover:opacity-80 transition-opacity"
             >
-              AgrIQ
+              <Image
+                src="/logo.png"
+                alt="AgrIQ"
+                width={120}
+                height={90}
+                className="h-8 w-auto"
+                priority
+              />
             </button>
           </div>
 

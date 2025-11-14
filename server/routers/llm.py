@@ -18,20 +18,20 @@ router = APIRouter(prefix="/llm", tags=["LLM"])
 @router.post("/query", response_model=LLMQueryResponse, status_code=status.HTTP_200_OK)
 @limiter.limit(get_rate_limit("llm_query"))
 async def query_llm(
-    http_request: Request,
-    request: LLMQueryRequest,
+    request: Request,
+    query_request: LLMQueryRequest,
     current_user: User = Depends(get_current_user),
     db: AsyncIOMotorDatabase = Depends(get_db)
 ):
     try:
-        if not request.question or not request.question.strip():
+        if not query_request.question or not query_request.question.strip():
             raise HTTPException(
                 status_code=status.HTTP_400_BAD_REQUEST,
                 detail="Question cannot be empty"
             )
         
         # Generate response
-        response = await generate_response(request)
+        response = await generate_response(query_request)
         
         # Save to database after generation
         user_id = current_user.id if isinstance(current_user.id, ObjectId) else ObjectId(current_user.id)
@@ -41,7 +41,7 @@ async def query_llm(
             "answer": response.answer,
             "difficulty": response.difficulty.value,
             "language": response.language.value,
-            "allow_code_mixing": request.allow_code_mixing,
+            "allow_code_mixing": query_request.allow_code_mixing,
             "created_at": datetime.utcnow()
         }
         

@@ -3,6 +3,7 @@
 import { useRouter } from 'next/navigation';
 import { useState, useEffect } from 'react';
 import { MessageSquare, Workflow, BookOpen, GraduationCap, FileText, X, LogOut } from 'lucide-react';
+import Image from 'next/image';
 import { Button } from '../ui/Button';
 import Link from 'next/link';
 import { getAuthToken, removeAuthToken } from '@/lib/api';
@@ -49,8 +50,15 @@ export function OnboardingHeader() {
       <div className="container mx-auto px-4 sm:px-6 lg:px-8">
         <div className="flex items-center justify-between h-16">
           <div className="flex items-center">
-            <Link href="/home" className="text-2xl font-bold text-primary hover:text-primary/80 transition-colors">
-              AgrIQ
+            <Link href="/home" className="flex items-center hover:opacity-80 transition-opacity">
+              <Image
+                src="/logo.png"
+                alt="AgrIQ"
+                width={120}
+                height={40}
+                className="h-8 w-auto"
+                priority
+              />
             </Link>
           </div>
           

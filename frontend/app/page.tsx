@@ -3,6 +3,7 @@
 import { useRouter } from 'next/navigation';
 import { useState, useEffect } from 'react';
 import { ArrowRight, Sparkles, Brain, Dna, Zap, Shield, TrendingUp, CheckCircle2 } from 'lucide-react';
+import Image from 'next/image';
 import { Button } from '@/components/ui/Button';
 import { Card } from '@/components/ui/Card';
 import Link from 'next/link';
@@ -54,8 +55,15 @@ export default function LandingPage() {
       <nav className="sticky top-0 z-50 bg-background/95 backdrop-blur-md border-b border-secondary/20">
         <div className="container mx-auto px-4 sm:px-6 lg:px-8">
           <div className="flex items-center justify-between h-16">
-            <Link href="/" className="text-2xl font-bold text-primary">
-              AgrIQ
+            <Link href="/" className="flex items-center hover:opacity-80 transition-opacity">
+              <Image
+                src="/logo.png"
+                alt="AgrIQ"
+                width={120}
+                height={40}
+                className="h-8 w-auto"
+                priority
+              />
             </Link>
             <div className="flex items-center gap-3">
               {isAuthenticated ? (
