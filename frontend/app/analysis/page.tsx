@@ -5,7 +5,7 @@ import { Dna, Microscope, Activity, Zap, Shield, Database, Cpu, Play, Pause, Rot
 import dynamic from 'next/dynamic';
 import { analyzeGeneEdits, getAnalysisHistory, getAnalysisDetail, generateEditSummary, type GeneAnalysisRequest, type GeneAnalysisResponse, type EditSuggestion, type AnalysisHistoryItem } from '@/lib/api';
 import { getAuthToken } from '@/lib/api';
-import { useRouter } from 'next/navigation';
+import { useRouter, useSearchParams } from 'next/navigation';
 import { MarkdownRenderer } from '@/components/ui/MarkdownRenderer';
 
 const RealTimeDNAEditingWrapper = dynamic(
@@ -15,6 +15,7 @@ const RealTimeDNAEditingWrapper = dynamic(
 
 const DNALab3D = () => {
   const router = useRouter();
+  const searchParams = useSearchParams();
   const [isPlaying, setIsPlaying] = useState(false);
   const [progress, setProgress] = useState(0);
   const [isAuthenticated, setIsAuthenticated] = useState(false);
@@ -49,12 +50,55 @@ const DNALab3D = () => {
   const [loadingHistory, setLoadingHistory] = useState(false);
   const [selectedAnalysisId, setSelectedAnalysisId] = useState<string | null>(null);
 
+  const generateSummary = async (analysisId: string) => {
+    setIsLoadingSummary(true);
+    setSummaryError(null);
+    try {
+      const summaryResponse = await generateEditSummary(analysisId);
+      setEditSummary(summaryResponse.summary);
+    } catch (error: any) {
+      console.error('Error generating summary:', error);
+      setSummaryError(error.detail || 'Failed to generate summary. The metrics above provide detailed information.');
+    } finally {
+      setIsLoadingSummary(false);
+    }
+  };
+
+  const handleViewAnalysis = async (analysisId: string) => {
+    try {
+      const detail = await getAnalysisDetail(analysisId);
+      setAnalysisResult(detail);
+      // Update DNA sequence from the analysis result if available
+      if (detail.dna_sequence) {
+        setDnaSequence(detail.dna_sequence);
+      }
+      setSelectedAnalysisId(analysisId);
+      setShowHistory(false);
+      setProgress(1);
+      setIsPlaying(true);
+      
+      // Auto-generate summary
+      generateSummary(analysisId);
+    } catch (error: any) {
+      console.error('Error loading analysis:', error);
+      setAnalysisError(error.detail || error.message || 'Failed to load analysis details.');
+    }
+  };
+
   useEffect(() => {
     setIsAuthenticated(!!getAuthToken());
     if (!getAuthToken()) {
       router.push('/login');
+      return;
     }
-  }, [router]);
+    
+    // Check if analysisId is in URL query params (from dashboard)
+    const analysisId = searchParams.get('analysisId');
+    if (analysisId) {
+      handleViewAnalysis(analysisId);
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [router, searchParams]);
 
   const handleReset = () => {
     setIsPlaying(false);
@@ -132,46 +176,6 @@ const DNALab3D = () => {
       loadHistory();
     }
     setShowHistory(!showHistory);
-  };
-
-  const handleViewAnalysis = async (analysisId: string) => {
-    try {
-      const detail = await getAnalysisDetail(analysisId);
-      setAnalysisResult(detail);
-      // Update DNA sequence from the analysis result if available
-      if (detail.dna_sequence) {
-        setDnaSequence(detail.dna_sequence);
-      }
-      setSelectedAnalysisId(analysisId);
-      setShowHistory(false);
-      setProgress(1);
-      setIsPlaying(true);
-      
-      // Reset summary and generate new one
-      setEditSummary(null);
-      setSummaryError(null);
-      generateSummary(analysisId);
-      
-      // Scroll to results
-      window.scrollTo({ top: 0, behavior: 'smooth' });
-    } catch (error: any) {
-      console.error('Error loading analysis detail:', error);
-      setAnalysisError(error.detail || 'Failed to load analysis details');
-    }
-  };
-
-  const generateSummary = async (analysisId: string) => {
-    setIsLoadingSummary(true);
-    setSummaryError(null);
-    try {
-      const summaryResponse = await generateEditSummary(analysisId);
-      setEditSummary(summaryResponse.summary);
-    } catch (error: any) {
-      console.error('Error generating summary:', error);
-      setSummaryError(error.detail || 'Failed to generate summary. The metrics above provide detailed information.');
-    } finally {
-      setIsLoadingSummary(false);
-    }
   };
 
   if (!isAuthenticated) {
