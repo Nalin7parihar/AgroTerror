@@ -12,7 +12,8 @@ from schemas.gene_analysis import (
     GeneAnalysisRequest,
     GeneAnalysisResponse,
     AnalysisHistoryResponse,
-    AnalysisHistoryItem
+    AnalysisHistoryItem,
+    EditSummaryResponse
 )
 from core.dependencies import get_current_user
 from core.database import get_db
@@ -20,6 +21,7 @@ from core.config import settings
 from core.rate_limit import limiter, get_rate_limit
 from model.user import User
 from motor.motor_asyncio import AsyncIOMotorDatabase
+from services.ollama import generate_edit_summary
 
 logger = logging.getLogger(__name__)
 
@@ -246,5 +248,74 @@ async def get_analysis_detail(
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail=f"Error retrieving analysis: {str(e)}"
+        )
+
+
+@router.post("/history/{analysis_id}/summary", response_model=EditSummaryResponse)
+@limiter.limit(get_rate_limit("gene_analysis_detail"))
+async def generate_summary(
+    request: Request,
+    analysis_id: str,
+    current_user: User = Depends(get_current_user),
+    db: AsyncIOMotorDatabase = Depends(get_db)
+):
+    """
+    Generate a comprehensive summary explaining the gene edit suggestions and their effects.
+    Uses Ollama (llama3.2) to generate human-readable explanations.
+    """
+    try:
+        # Validate ObjectId
+        try:
+            obj_id = ObjectId(analysis_id)
+        except Exception:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="Invalid analysis ID format"
+            )
+        
+        # Find analysis
+        analysis = await db.gene_analyses.find_one({
+            "_id": obj_id,
+            "user_id": current_user.id
+        })
+        
+        if not analysis:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail="Analysis not found"
+            )
+        
+        # Convert to GeneAnalysisResponse
+        analysis_response = GeneAnalysisResponse(
+            analysis_id=str(analysis["_id"]),
+            request_id=analysis.get("request_id", str(analysis["_id"])),
+            dna_sequence=analysis.get("dna_sequence", ""),
+            edit_suggestions=analysis.get("edit_suggestions", []),
+            dnabert_validations=analysis.get("dnabert_validations", []),
+            snp_changes=analysis.get("snp_changes", []),
+            summary=analysis.get("summary", {}),
+            metrics=analysis.get("metrics", {}),
+            created_at=analysis.get("created_at", datetime.utcnow())
+        )
+        
+        # Get target trait
+        target_trait = analysis.get("target_trait", "custom")
+        
+        # Generate summary using Ollama
+        logger.info(f"Generating summary for analysis {analysis_id} using Ollama")
+        summary_text = await generate_edit_summary(analysis_response, target_trait)
+        
+        return EditSummaryResponse(
+            analysis_id=analysis_id,
+            summary=summary_text
+        )
+        
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Error generating summary: {str(e)}")
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Error generating summary: {str(e)}"
         )
 

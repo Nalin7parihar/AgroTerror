@@ -57,3 +57,5 @@ curl -X POST "$BASE_URL/api/v1/gene-edit/suggest" \
   }'
 
 
+
+

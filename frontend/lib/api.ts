@@ -216,3 +216,14 @@ export async function getAnalysisDetail(analysisId: string): Promise<GeneAnalysi
   return apiRequest<GeneAnalysisResponse>(`/gene-analysis/history/${analysisId}`);
 }
 
+export interface EditSummaryResponse {
+  analysis_id: string;
+  summary: string;
+}
+
+export async function generateEditSummary(analysisId: string): Promise<EditSummaryResponse> {
+  return apiRequest<EditSummaryResponse>(`/gene-analysis/history/${analysisId}/summary`, {
+    method: 'POST',
+  });
+}
+

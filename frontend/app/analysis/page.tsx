@@ -1,11 +1,12 @@
 'use client';
 
 import React, { useState, useEffect } from 'react';
-import { Dna, Microscope, Activity, Zap, Shield, Database, Cpu, Play, Pause, RotateCcw, Loader2, CheckCircle2, XCircle, History, TrendingUp, AlertCircle } from 'lucide-react';
+import { Dna, Microscope, Activity, Zap, Shield, Database, Cpu, Play, Pause, RotateCcw, Loader2, CheckCircle2, XCircle, History, TrendingUp, AlertCircle, FileText } from 'lucide-react';
 import dynamic from 'next/dynamic';
-import { analyzeGeneEdits, getAnalysisHistory, getAnalysisDetail, type GeneAnalysisRequest, type GeneAnalysisResponse, type EditSuggestion, type AnalysisHistoryItem } from '@/lib/api';
+import { analyzeGeneEdits, getAnalysisHistory, getAnalysisDetail, generateEditSummary, type GeneAnalysisRequest, type GeneAnalysisResponse, type EditSuggestion, type AnalysisHistoryItem } from '@/lib/api';
 import { getAuthToken } from '@/lib/api';
 import { useRouter } from 'next/navigation';
+import { MarkdownRenderer } from '@/components/ui/MarkdownRenderer';
 
 const RealTimeDNAEditingWrapper = dynamic(
   () => import('@/components/animations/RealTimeDNAEditingWrapper').then(mod => ({ default: mod.RealTimeDNAEditingWrapper })),
@@ -29,6 +30,9 @@ const DNALab3D = () => {
   const [isAnalyzing, setIsAnalyzing] = useState(false);
   const [analysisError, setAnalysisError] = useState<string | null>(null);
   const [analysisResult, setAnalysisResult] = useState<GeneAnalysisResponse | null>(null);
+  const [editSummary, setEditSummary] = useState<string | null>(null);
+  const [isLoadingSummary, setIsLoadingSummary] = useState(false);
+  const [summaryError, setSummaryError] = useState<string | null>(null);
   
   // Available datasets (matching .bim files)
   const availableDatasets = [
@@ -90,6 +94,15 @@ const DNALab3D = () => {
       setProgress(0); // Reset progress
       setIsPlaying(false);
       
+      // Reset summary when new analysis is done
+      setEditSummary(null);
+      setSummaryError(null);
+      
+      // Auto-generate summary after analysis completes
+      if (result.analysis_id) {
+        generateSummary(result.analysis_id);
+      }
+      
       // Refresh history after analysis
       if (showHistory) {
         loadHistory();
@@ -133,11 +146,31 @@ const DNALab3D = () => {
       setShowHistory(false);
       setProgress(1);
       setIsPlaying(true);
+      
+      // Reset summary and generate new one
+      setEditSummary(null);
+      setSummaryError(null);
+      generateSummary(analysisId);
+      
       // Scroll to results
       window.scrollTo({ top: 0, behavior: 'smooth' });
     } catch (error: any) {
       console.error('Error loading analysis detail:', error);
       setAnalysisError(error.detail || 'Failed to load analysis details');
+    }
+  };
+
+  const generateSummary = async (analysisId: string) => {
+    setIsLoadingSummary(true);
+    setSummaryError(null);
+    try {
+      const summaryResponse = await generateEditSummary(analysisId);
+      setEditSummary(summaryResponse.summary);
+    } catch (error: any) {
+      console.error('Error generating summary:', error);
+      setSummaryError(error.detail || 'Failed to generate summary. The metrics above provide detailed information.');
+    } finally {
+      setIsLoadingSummary(false);
     }
   };
 
@@ -335,13 +368,15 @@ const DNALab3D = () => {
                 {historyItems.map((item) => (
                   <div
                     key={item.analysis_id}
-                    onClick={() => handleViewAnalysis(item.analysis_id)}
-                    className={`p-4 bg-[var(--background)]/50 border rounded-lg cursor-pointer hover:border-[var(--primary)]/60 transition ${
+                    className={`p-4 bg-[var(--background)]/50 border rounded-lg ${
                       selectedAnalysisId === item.analysis_id ? 'border-[var(--primary)]' : 'border-[var(--primary)]/30'
                     }`}
                   >
                     <div className="flex justify-between items-start mb-2">
-                      <div>
+                      <div 
+                        className="flex-1 cursor-pointer"
+                        onClick={() => handleViewAnalysis(item.analysis_id)}
+                      >
                         <p className="font-semibold text-sm">{item.target_trait.replace('_', ' ').toUpperCase()}</p>
                         <p className="text-xs text-[var(--text)]/50 mt-1">
                           {item.dataset_name && (
@@ -357,7 +392,35 @@ const DNALab3D = () => {
                         <p className="text-xs text-[var(--text)]/50">SNPs: {item.summary.total_snps_affected}</p>
                       </div>
                     </div>
-                    <p className="text-xs font-mono text-[var(--text)]/70 truncate">{item.dna_sequence}</p>
+                    <p className="text-xs font-mono text-[var(--text)]/70 truncate mb-2 cursor-pointer" onClick={() => handleViewAnalysis(item.analysis_id)}>
+                      {item.dna_sequence}
+                    </p>
+                    <div className="flex gap-2 pt-2 border-t border-[var(--primary)]/20">
+                      <button
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          handleViewAnalysis(item.analysis_id);
+                        }}
+                        className="flex-1 px-3 py-1.5 bg-[var(--primary)]/20 hover:bg-[var(--primary)]/30 border border-[var(--primary)]/50 rounded text-xs font-semibold text-[var(--primary)] transition flex items-center justify-center gap-1"
+                      >
+                        <Activity className="w-3 h-3" />
+                        View
+                      </button>
+                      <button
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          // Load the analysis and generate summary
+                          handleViewAnalysis(item.analysis_id);
+                          setTimeout(() => {
+                            generateSummary(item.analysis_id);
+                          }, 500);
+                        }}
+                        className="flex-1 px-3 py-1.5 bg-[var(--accent)]/20 hover:bg-[var(--accent)]/30 border border-[var(--accent)]/50 rounded text-xs font-semibold text-[var(--accent)] transition flex items-center justify-center gap-1"
+                      >
+                        <FileText className="w-3 h-3" />
+                        Summary
+                      </button>
+                    </div>
                   </div>
                 ))}
               </div>
@@ -427,6 +490,40 @@ const DNALab3D = () => {
                     )}
                   </div>
                 ))}
+              </div>
+            </div>
+
+            {/* Edit Summary Explanation */}
+            <div className="mb-6" data-summary-section>
+              <div className="flex items-center gap-2 mb-3">
+                <FileText className="w-5 h-5 text-[var(--primary)]" />
+                <h3 className="font-semibold">Summary of Edit Effects</h3>
+              </div>
+              <div className="p-4 sm:p-6 bg-gradient-to-br from-[var(--primary)]/10 to-[var(--accent)]/10 border border-[var(--primary)]/30 rounded-lg">
+                {isLoadingSummary ? (
+                  <div className="flex items-center justify-center gap-3 py-8">
+                    <Loader2 className="w-5 h-5 animate-spin text-[var(--primary)]" />
+                    <p className="text-sm text-[var(--text)]/70">Generating summary explanation...</p>
+                  </div>
+                ) : summaryError ? (
+                  <div className="flex items-start gap-2 p-3 bg-red-500/20 border border-red-500/50 rounded-lg">
+                    <AlertCircle className="w-5 h-5 text-red-500 flex-shrink-0 mt-0.5" />
+                    <div>
+                      <p className="text-sm text-red-400 font-semibold mb-1">Summary Generation Failed</p>
+                      <p className="text-xs text-red-300">{summaryError}</p>
+                    </div>
+                  </div>
+                ) : editSummary ? (
+                  <div className="text-sm sm:text-base">
+                    <MarkdownRenderer content={editSummary} />
+                  </div>
+                ) : (
+                  <div className="text-center py-8">
+                    <p className="text-sm text-[var(--text)]/50">
+                      Summary will be generated automatically...
+                    </p>
+                  </div>
+                )}
               </div>
             </div>
 
@@ -519,30 +616,74 @@ const DNALab3D = () => {
               </div>
             </div>
 
-            {/* Lab Tools */}
+            {/* Summary Controls */}
             <div className="bg-[var(--secondary)]/20 backdrop-blur-sm border border-[var(--primary)]/30 rounded-xl p-4 sm:p-6">
               <div className="flex items-center gap-3 mb-4">
-                <Microscope className="w-5 h-5 text-[var(--primary)]" />
-                <h2 className="text-base sm:text-lg font-bold">Lab Tools</h2>
+                <FileText className="w-5 h-5 text-[var(--primary)]" />
+                <h2 className="text-base sm:text-lg font-bold">Summary Controls</h2>
               </div>
-              <div className="grid grid-cols-2 gap-2 sm:gap-3">
-                {[
-                  { icon: Cpu, label: 'Sequence', color: 'primary' },
-                  { icon: Zap, label: 'Analyze', color: 'primary' },
-                  { icon: Shield, label: 'Validate', color: 'secondary' },
-                  { icon: Database, label: 'Store', color: 'accent' }
-                ].map((tool, idx) => (
-                  <button
-                    key={idx}
-                    className="p-3 sm:p-4 bg-[var(--secondary)]/30 hover:bg-[var(--secondary)]/50 border border-[var(--primary)]/30 rounded-lg transition group"
-                  >
-                    <tool.icon 
-                      className="w-5 h-5 sm:w-6 sm:h-6 mb-2 mx-auto group-hover:scale-110 transition"
-                      style={{ color: `var(--${tool.color})` }}
-                    />
-                    <p className="text-xs sm:text-sm">{tool.label}</p>
-                  </button>
-                ))}
+              <div className="space-y-3">
+                {analysisResult ? (
+                  <>
+                    <button
+                      onClick={() => generateSummary(analysisResult.analysis_id)}
+                      disabled={isLoadingSummary}
+                      className="w-full p-3 bg-[var(--primary)]/20 hover:bg-[var(--primary)]/30 border border-[var(--primary)]/50 rounded-lg transition flex items-center justify-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed group"
+                    >
+                      {isLoadingSummary ? (
+                        <>
+                          <Loader2 className="w-4 h-4 animate-spin text-[var(--primary)]" />
+                          <span className="text-sm font-semibold text-[var(--primary)]">Generating...</span>
+                        </>
+                      ) : (
+                        <>
+                          <Zap className="w-4 h-4 text-[var(--primary)] group-hover:scale-110 transition" />
+                          <span className="text-sm font-semibold text-[var(--primary)]">
+                            {editSummary ? 'Regenerate Summary' : 'Generate Summary'}
+                          </span>
+                        </>
+                      )}
+                    </button>
+                    
+                    {editSummary && (
+                      <button
+                        onClick={() => {
+                          const summaryElement = document.querySelector('[data-summary-section]');
+                          if (summaryElement) {
+                            summaryElement.scrollIntoView({ behavior: 'smooth', block: 'start' });
+                          }
+                        }}
+                        className="w-full p-3 bg-[var(--accent)]/20 hover:bg-[var(--accent)]/30 border border-[var(--accent)]/50 rounded-lg transition flex items-center justify-center gap-2 group"
+                      >
+                        <FileText className="w-4 h-4 text-[var(--accent)] group-hover:scale-110 transition" />
+                        <span className="text-sm font-semibold text-[var(--accent)]">View Summary</span>
+                      </button>
+                    )}
+                    
+                    <div className="pt-2 border-t border-[var(--primary)]/20">
+                      <div className="flex items-center justify-between text-xs">
+                        <span className="text-[var(--text)]/50">Summary Status:</span>
+                        <span className={`font-semibold ${
+                          editSummary ? 'text-green-500' : 
+                          isLoadingSummary ? 'text-[var(--primary)]' : 
+                          summaryError ? 'text-red-500' : 
+                          'text-[var(--text)]/50'
+                        }`}>
+                          {editSummary ? 'Available' : 
+                           isLoadingSummary ? 'Generating...' : 
+                           summaryError ? 'Failed' : 
+                           'Not Generated'}
+                        </span>
+                      </div>
+                    </div>
+                  </>
+                ) : (
+                  <div className="text-center py-4">
+                    <p className="text-xs text-[var(--text)]/50">
+                      Load an analysis to generate summary
+                    </p>
+                  </div>
+                )}
               </div>
             </div>
           </div>

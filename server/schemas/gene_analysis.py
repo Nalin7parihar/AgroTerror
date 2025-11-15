@@ -98,3 +98,9 @@ class AnalysisHistoryResponse(BaseModel):
     analyses: List[AnalysisHistoryItem]
     total: int
 
+
+class EditSummaryResponse(BaseModel):
+    """Response model for generated edit summary"""
+    analysis_id: str
+    summary: str
+
