@@ -260,6 +260,12 @@ export default function ResourcesPage() {
                   View Documentation
                 </Button>
                 <Button
+                  variant="primary"
+                  onClick={() => router.push('/home/snp-browser')}
+                >
+                  SNP Locus Browser
+                </Button>
+                <Button
                   variant="outline"
                   onClick={() => router.push('/dashboard/chatbot')}
                 >

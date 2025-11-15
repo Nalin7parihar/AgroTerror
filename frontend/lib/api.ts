@@ -227,3 +227,41 @@ export async function generateEditSummary(analysisId: string): Promise<EditSumma
   });
 }
 
+export async function exportAnalysisReport(analysisId: string, format: 'html' | 'pdf' = 'html'): Promise<Blob> {
+  const token = typeof window !== 'undefined' 
+    ? localStorage.getItem('auth_token') 
+    : null;
+
+  const headers: HeadersInit = {};
+  if (token) {
+    (headers as Record<string, string>)['Authorization'] = `Bearer ${token}`;
+  }
+
+  const response = await fetch(`${API_BASE_URL}/gene-analysis/history/${analysisId}/report?format=${format}`, {
+    method: 'GET',
+    headers,
+  });
+
+  if (!response.ok) {
+    let errorDetail = `HTTP ${response.status}: ${response.statusText}`;
+    try {
+      const errorJson = await response.json();
+      errorDetail = errorJson.detail || errorDetail;
+    } catch {
+      // If response is not JSON, use default error message
+    }
+    const error: ApiError = {
+      detail: errorDetail,
+      status: response.status,
+    };
+    throw error;
+  }
+
+  // Get the blob with correct MIME type
+  const contentType = response.headers.get('content-type') || (format === 'pdf' ? 'application/pdf' : 'text/html');
+  const blob = await response.blob();
+  
+  // Return blob with correct type
+  return new Blob([blob], { type: contentType });
+}
+

@@ -79,15 +79,19 @@ docker-compose down -v
 
 ### 4. Run the Server
 
+Using `uv run` (recommended - uses correct Python environment):
+
 ```bash
-uvicorn main:app --reload
+uv run uvicorn main:app --reload
 ```
 
 Or using Python directly:
 
 ```bash
-python main.py
+uv run python main.py
 ```
+
+**Note:** Make sure to use `uv run` to ensure the server uses the correct Python environment with all dependencies installed.
 
 The API will be available at `http://localhost:8000`
 

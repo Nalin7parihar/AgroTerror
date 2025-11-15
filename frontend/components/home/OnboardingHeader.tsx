@@ -2,7 +2,7 @@
 
 import { useRouter } from 'next/navigation';
 import { useState, useEffect } from 'react';
-import { MessageSquare, Workflow, BookOpen, GraduationCap, FileText, X, LogOut } from 'lucide-react';
+import { MessageSquare, Workflow, BookOpen, GraduationCap, FileText, X, LogOut, Dna } from 'lucide-react';
 import Image from 'next/image';
 import { Button } from '../ui/Button';
 import Link from 'next/link';
@@ -13,6 +13,12 @@ const quickLinks = [
     icon: <MessageSquare className="w-5 h-5" />,
     title: 'AI Tutor',
     href: '/dashboard/chatbot',
+    color: 'primary',
+  },
+  {
+    icon: <Dna className="w-5 h-5" />,
+    title: 'SNP Browser',
+    href: '/home/snp-browser',
     color: 'primary',
   },
   {
@@ -65,11 +71,10 @@ export function OnboardingHeader() {
           {/* Desktop Navigation */}
           <nav className="hidden md:flex items-center gap-2">
             {quickLinks.map((link, index) => {
-              const isPrimary = link.color === 'primary';
               return (
                 <Button
                   key={index}
-                  variant="outline"
+                  variant="primary"
                   size="sm"
                   onClick={() => {
                     if (link.href.startsWith('/')) {
@@ -78,9 +83,7 @@ export function OnboardingHeader() {
                       console.log(`Navigate to ${link.title}`);
                     }
                   }}
-                  className={`flex items-center gap-2 ${
-                    isPrimary ? 'border-primary text-primary hover:bg-primary hover:text-background' : 'border-accent text-accent hover:bg-accent hover:text-background'
-                  }`}
+                  className="flex items-center gap-2 bg-transparent text-text/80 hover:bg-primary hover:text-background"
                 >
                   {link.icon}
                   <span>{link.title}</span>

@@ -22,7 +22,18 @@ logger = logging.getLogger(__name__)
 @asynccontextmanager
 async def lifespan(app : FastAPI):
     # Startup
-    logger.info("Starting application...")
+    logger.info("Starting AgroTerror server...")
+    
+    # Check xhtml2pdf availability
+    try:
+        from routers.gene_analysis import XHTML2PDF_AVAILABLE
+        if XHTML2PDF_AVAILABLE:
+            logger.info("✓ PDF export enabled (xhtml2pdf available)")
+        else:
+            logger.warning("✗ PDF export disabled (xhtml2pdf not available)")
+    except Exception as e:
+        logger.warning(f"Could not check PDF export availability: {e}")
+    
     await connect_to_mongo()
     await connect_to_redis()
     
@@ -37,6 +48,7 @@ async def lifespan(app : FastAPI):
     else:
         logger.warning("✗ Redis is not available - caching is disabled")
     
+    logger.info("✓ Server startup complete")
     yield
     # Shutdown
     logger.info("Shutting down application...")
@@ -88,4 +100,5 @@ async def root():
 
 if __name__ == "__main__":
     import uvicorn
+    # Note: Run with 'uv run python main.py' to use the correct Python environment
     uvicorn.run("main:app", host="localhost", port=8000, reload=True)

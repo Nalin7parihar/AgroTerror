@@ -1,9 +1,9 @@
 'use client';
 
 import React, { useState, useEffect } from 'react';
-import { Dna, Microscope, Activity, Zap, Shield, Database, Cpu, Play, Pause, RotateCcw, Loader2, CheckCircle2, XCircle, History, TrendingUp, AlertCircle, FileText } from 'lucide-react';
+import { Dna, Microscope, Activity, Zap, Shield, Database, Cpu, RotateCcw, Loader2, CheckCircle2, XCircle, History, TrendingUp, AlertCircle, FileText, Download } from 'lucide-react';
 import dynamic from 'next/dynamic';
-import { analyzeGeneEdits, getAnalysisHistory, getAnalysisDetail, generateEditSummary, type GeneAnalysisRequest, type GeneAnalysisResponse, type EditSuggestion, type AnalysisHistoryItem } from '@/lib/api';
+import { analyzeGeneEdits, getAnalysisHistory, getAnalysisDetail, generateEditSummary, exportAnalysisReport, type GeneAnalysisRequest, type GeneAnalysisResponse, type EditSuggestion, type AnalysisHistoryItem } from '@/lib/api';
 import { getAuthToken } from '@/lib/api';
 import { useRouter } from 'next/navigation';
 import { MarkdownRenderer } from '@/components/ui/MarkdownRenderer';
@@ -33,6 +33,7 @@ const DNALab3D = () => {
   const [editSummary, setEditSummary] = useState<string | null>(null);
   const [isLoadingSummary, setIsLoadingSummary] = useState(false);
   const [summaryError, setSummaryError] = useState<string | null>(null);
+  const [isExporting, setIsExporting] = useState(false);
   
   // Available datasets (matching .bim files)
   const availableDatasets = [
@@ -171,6 +172,66 @@ const DNALab3D = () => {
       setSummaryError(error.detail || 'Failed to generate summary. The metrics above provide detailed information.');
     } finally {
       setIsLoadingSummary(false);
+    }
+  };
+
+  const handleExportReport = async (format: 'html' | 'pdf' = 'html') => {
+    if (!analysisResult?.analysis_id) {
+      setAnalysisError('No analysis result available for export');
+      setTimeout(() => setAnalysisError(null), 5000);
+      return;
+    }
+    
+    setIsExporting(true);
+    try {
+      console.log(`Exporting ${format.toUpperCase()} report for analysis: ${analysisResult.analysis_id}`);
+      const blob = await exportAnalysisReport(analysisResult.analysis_id, format);
+      
+      if (!blob || blob.size === 0) {
+        throw new Error('Received empty file from server');
+      }
+      
+      console.log(`Received ${format.toUpperCase()} blob: ${blob.size} bytes, type: ${blob.type}`);
+      
+      // Verify blob type
+      if (format === 'pdf' && !blob.type.includes('pdf')) {
+        console.warn(`Expected PDF blob, got: ${blob.type}`);
+      }
+      
+      // Create download link
+      const url = window.URL.createObjectURL(blob);
+      const link = document.createElement('a');
+      link.href = url;
+      link.download = `gene-analysis-report-${analysisResult.analysis_id}.${format === 'pdf' ? 'pdf' : 'html'}`;
+      link.style.display = 'none';
+      document.body.appendChild(link);
+      link.click();
+      
+      // Clean up after a short delay
+      setTimeout(() => {
+        document.body.removeChild(link);
+        window.URL.revokeObjectURL(url);
+      }, 100);
+      
+      // For HTML, also open in new tab for preview
+      if (format === 'html') {
+        const htmlUrl = window.URL.createObjectURL(blob);
+        window.open(htmlUrl, '_blank');
+        setTimeout(() => window.URL.revokeObjectURL(htmlUrl), 100);
+      }
+      
+      console.log(`${format.toUpperCase()} export completed successfully`);
+    } catch (error: any) {
+      console.error('Error exporting report:', error);
+      const errorMessage = error.detail || error.message || 'Failed to export report. Please try again.';
+      setAnalysisError(`Export failed: ${errorMessage}`);
+      
+      // Show error temporarily
+      setTimeout(() => {
+        setAnalysisError(null);
+      }, 8000);
+    } finally {
+      setIsExporting(false);
     }
   };
 
@@ -431,10 +492,49 @@ const DNALab3D = () => {
         {/* Results Section */}
         {analysisResult && (
           <div className="bg-[var(--secondary)]/20 backdrop-blur-sm border border-[var(--primary)]/30 rounded-xl p-4 sm:p-6 mb-6">
-            <h2 className="text-lg sm:text-xl font-bold mb-4 flex items-center gap-2">
-              <CheckCircle2 className="w-5 h-5 sm:w-6 sm:h-6 text-green-500" />
-              Analysis Results
-            </h2>
+            <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 mb-4">
+              <h2 className="text-lg sm:text-xl font-bold flex items-center gap-2">
+                <CheckCircle2 className="w-5 h-5 sm:w-6 sm:h-6 text-green-500" />
+                Analysis Results
+              </h2>
+              <div className="flex gap-2 flex-wrap">
+                <button
+                  onClick={() => handleExportReport('html')}
+                  disabled={isExporting || !analysisResult?.analysis_id}
+                  className="px-4 py-2 bg-[var(--primary)]/20 hover:bg-[var(--primary)]/30 border border-[var(--primary)]/50 rounded-lg transition flex items-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed text-sm font-semibold"
+                >
+                  {isExporting ? (
+                    <>
+                      <Loader2 className="w-4 h-4 animate-spin text-[var(--primary)]" />
+                      Exporting...
+                    </>
+                  ) : (
+                    <>
+                      <Download className="w-4 h-4 text-[var(--primary)]" />
+                      Export HTML
+                    </>
+                  )}
+                </button>
+                <button
+                  onClick={() => handleExportReport('pdf')}
+                  disabled={isExporting || !analysisResult?.analysis_id}
+                  className="px-4 py-2 bg-[var(--accent)] hover:bg-[var(--accent)]/90 text-background border border-[var(--accent)]/50 rounded-lg transition flex items-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed text-sm font-semibold shadow-sm"
+                  title="Export analysis report as PDF"
+                >
+                  {isExporting ? (
+                    <>
+                      <Loader2 className="w-4 h-4 animate-spin text-background" />
+                      Exporting...
+                    </>
+                  ) : (
+                    <>
+                      <FileText className="w-4 h-4 text-background" />
+                      Export PDF
+                    </>
+                  )}
+                </button>
+              </div>
+            </div>
             
             {/* Summary */}
             <div className="grid md:grid-cols-3 gap-4 mb-6">
@@ -698,14 +798,6 @@ const DNALab3D = () => {
                 </div>
                 <div className="flex gap-2">
                   <button
-                    onClick={() => setIsPlaying(!isPlaying)}
-                    className="p-2 sm:p-3 bg-[var(--primary)]/20 hover:bg-[var(--primary)]/30 rounded-lg transition"
-                    aria-label={isPlaying ? 'Pause animation' : 'Play animation'}
-                    disabled={!analysisResult}
-                  >
-                    {isPlaying ? <Pause className="w-4 h-4 sm:w-5 sm:h-5 text-[var(--primary)]" /> : <Play className="w-4 h-4 sm:w-5 sm:h-5 text-[var(--primary)]" />}
-                  </button>
-                  <button
                     onClick={handleReset}
                     className="p-2 sm:p-3 bg-[var(--secondary)]/20 hover:bg-[var(--secondary)]/30 rounded-lg transition"
                     aria-label="Reset simulation"
@@ -817,7 +909,7 @@ const DNALab3D = () => {
                 )}
               </div>
               
-              {/* Progress Bar */}
+             {/*} 
               {progress > 0 && (
                 <div className="mt-4">
                   <div className="w-full h-2 bg-[var(--secondary)]/30 rounded-full overflow-hidden">
@@ -831,6 +923,7 @@ const DNALab3D = () => {
                   </p>
                 </div>
               )}
+              */}
 
               {/* Base Pairs Legend */}
               <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 sm:gap-4 mt-4 sm:mt-6">
